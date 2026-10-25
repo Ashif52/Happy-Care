@@ -364,6 +364,10 @@ class TicketAssignRequest(BaseModel):
     expected_assigned_staff_id: Optional[int] = -999
     note: Optional[str] = None
 
+class TicketTransferDepartmentRequest(BaseModel):
+    new_department_id: str
+    reason: Optional[str] = None
+
 class TicketAcknowledgeRequest(BaseModel):
     note: Optional[str] = None
 

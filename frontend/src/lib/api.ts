@@ -51,6 +51,13 @@ export function getFileUrl(url: string | null | undefined): string {
     return url;
   }
   const clean = url.startsWith("/") ? url : `/${url}`;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    const isLocal = host === "localhost" || host === "127.0.0.1" || /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
+    if (isLocal) {
+      return `http://${host}:8000${clean}`;
+    }
+  }
   return `${getBackendBase()}${clean}`;
 }
 
@@ -289,6 +296,9 @@ export interface AIVerificationJob {
   status: string;
   before_evidence_id?: number | null;
   after_evidence_id?: number | null;
+  provider_selected?: string;
+  model_name_selected?: string;
+  is_demo?: boolean;
   evidence_relevance: string;
   equipment_match: string;
   visible_fault_assessment: string;
@@ -872,6 +882,18 @@ export const api = {
         note,
       }),
     }),
+  transferTicketDepartment: (
+    id: number,
+    newDepartmentId: string,
+    reason?: string
+  ) =>
+    fetchWithAuth(`/tickets/${id}/transfer-department`, {
+      method: "POST",
+      body: JSON.stringify({
+        new_department_id: newDepartmentId,
+        reason,
+      }),
+    }),
   startWork: (id: number, note?: string) =>
     fetchWithAuth(`/tickets/${id}/start-work`, { method: "POST", body: JSON.stringify({ note }) }),
   submitResolution: (id: number, data: { resolution_summary: string; parts_replaced?: string; functional_test_notes?: string }) =>
@@ -897,8 +919,8 @@ export const api = {
   // AI Verification
   getVerificationQueue: (deptId?: string) =>
     fetchWithAuth(deptId ? `/ai-verify/queue?department_id=${deptId}` : "/ai-verify/queue"),
-  triggerAIAnalysis: (ticketId: number) =>
-    fetchWithAuth(`/ai-verify/${ticketId}/analyze`, { method: "POST" }),
+  triggerAIAnalysis: (ticketId: number, options?: { provider?: string; model_name?: string; api_key?: string }) =>
+    fetchWithAuth(`/ai-verify/${ticketId}/analyze`, { method: "POST", body: JSON.stringify(options || {}) }),
   reviewVerification: (jobId: number, data: { decision: string; notes?: string; override_reason?: string }) =>
     fetchWithAuth(`/ai-verify/${jobId}/review`, { method: "POST", body: JSON.stringify(data) }),
 
@@ -1248,8 +1270,10 @@ export const api = {
   // ============================================================================
   getAIModels: () =>
     fetchWithAuth("/ai-verify/models"),
-  configureAIModel: (provider: string, modelName: string) =>
-    fetchWithAuth("/ai-verify/configure-model", { method: "POST", body: JSON.stringify({ provider, model_name: modelName }) }),
+  configureAIModel: (provider: string, modelName: string, apiKey?: string) =>
+    fetchWithAuth("/ai-verify/configure-model", { method: "POST", body: JSON.stringify({ provider, model_name: modelName, api_key: apiKey }) }),
+  testAIConnection: (data: { provider: string; model_name?: string; api_key?: string }) =>
+    fetchWithAuth("/ai-verify/test-connection", { method: "POST", body: JSON.stringify(data) }),
 };
 
 

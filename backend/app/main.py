@@ -107,20 +107,23 @@ app.add_middleware(
 )
 
 # Safe file access endpoint with path traversal prevention
-@app.get("/uploads/{subfolder}/{filename}")
-async def serve_upload(subfolder: str, filename: str):
-    clean_subfolder = StorageService._sanitize_subfolder(subfolder)
-    clean_filename = Path(filename).name
-    file_path = (Path(settings.UPLOAD_DIR) / clean_subfolder / clean_filename).resolve()
+@app.get("/uploads/{file_path:path}")
+async def serve_upload(file_path: str):
+    # Sanitize: prevent directory traversal
+    clean_parts = [p for p in Path(file_path).parts if p not in ("..", ".", "/", "\\")]
+    if not clean_parts:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    
+    target_path = Path(settings.UPLOAD_DIR).joinpath(*clean_parts).resolve()
     base_dir = Path(settings.UPLOAD_DIR).resolve()
     
     # Enforce directory containment
-    if not str(file_path).startswith(str(base_dir)):
+    if not str(target_path).startswith(str(base_dir)):
         raise HTTPException(status_code=403, detail="Forbidden file access")
-    if not file_path.is_file() or not file_path.exists():
+    if not target_path.is_file() or not target_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
         
-    return FileResponse(file_path)
+    return FileResponse(target_path)
 
 # Include Routers under API_V1_STR
 app.include_router(auth.router, prefix=settings.API_V1_STR)

@@ -54,7 +54,7 @@ def seed_database():
         # 1. Seed Users (Admin & Supervisors first so foreign keys work)
         admin = User(
             email="admin@careops.hospital",
-            name="Dr. Alistair Vance",
+            name="Dr. Pavithra",
             role="admin",
             department_id=None,
             phone="+91 98765 43210",

@@ -61,12 +61,29 @@ async def upload_evidence(
     after_ev = db.query(Evidence).filter(Evidence.ticket_id == ticket.id, Evidence.stage == "after").order_by(Evidence.id.desc()).first()
     
     if stage == "after" and before_ev and after_ev:
-        analysis_data = AIVisionService.analyze_ticket_evidence(ticket, before_ev, after_ev)
+        from app.models import SystemSecuritySetting
+        sec = db.query(SystemSecuritySetting).filter(SystemSecuritySetting.id == 1).first()
+        active_provider = sec.ai_vision_provider if sec else "mock"
+        active_model = sec.ai_vision_model if sec else "careops-vision-default"
+        api_key = None
+        if active_provider == "gemini":
+            api_key = (sec and sec.gemini_api_key) or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or settings.GEMINI_API_KEY
+        elif active_provider == "openai":
+            api_key = (sec and sec.openai_api_key) or os.getenv("OPENAI_API_KEY") or settings.OPENAI_API_KEY
+        elif active_provider == "anthropic":
+            api_key = (sec and sec.anthropic_api_key) or os.getenv("ANTHROPIC_API_KEY")
+
+        analysis_data = AIVisionService.analyze_ticket_evidence(
+            ticket, before_ev, after_ev, provider=active_provider, model_name=active_model, api_key=api_key
+        )
         ai_job = AIVerificationJob(
             ticket_id=ticket.id,
             status="completed",
             before_evidence_id=before_ev.id,
             after_evidence_id=after_ev.id,
+            provider_selected=analysis_data.get("provider_selected", active_provider),
+            model_name_selected=analysis_data.get("model_name_selected", active_model),
+            is_demo=analysis_data.get("is_demo", False),
             evidence_relevance=analysis_data["evidence_relevance"],
             equipment_match=analysis_data["equipment_match"],
             visible_fault_assessment=analysis_data["visible_fault_assessment"],

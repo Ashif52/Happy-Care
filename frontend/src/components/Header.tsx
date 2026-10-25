@@ -13,7 +13,8 @@ import {
   LogOut,
   RefreshCw,
   KeyRound,
-  User as UserIcon
+  User as UserIcon,
+  Menu
 } from "lucide-react";
 import { User, SimulationAccount, api } from "@/lib/api";
 import { ChangePasswordModal } from "@/components/ChangePasswordModal";
@@ -32,6 +33,7 @@ interface HeaderProps {
   onLogout: () => void;
   onSelectTicket?: (ticketId: number) => void;
   onNavigateTab?: (tab: string) => void;
+  onToggleSidebar?: () => void;
 }
 
 export function Header({
@@ -47,6 +49,7 @@ export function Header({
   onLogout,
   onSelectTicket,
   onNavigateTab,
+  onToggleSidebar,
 }: HeaderProps) {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -171,9 +174,18 @@ export function Header({
 
   return (
     <header className="h-15 glass-header sticky top-0 z-20 flex items-center justify-between px-5 sm:px-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm sm:text-base font-extrabold text-[#0F172A] tracking-tight">
+      {/* Breadcrumb & Mobile Menu Toggle */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="md:hidden p-1.5 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+          aria-label="Toggle navigation"
+          title="Toggle navigation"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <span className="text-sm sm:text-base font-extrabold text-[#0F172A] tracking-tight truncate max-w-[180px] sm:max-w-none">
           {breadcrumbsMap[currentTab] || "Operations Dashboard"}
         </span>
       </div>

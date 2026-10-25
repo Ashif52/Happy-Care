@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   Play,
@@ -11,18 +11,27 @@ import {
   ArrowRight,
   ShieldCheck,
   Eye,
+  EyeOff,
   Camera,
   Film,
+  Video,
   FileQuestion,
-  HelpCircle
+  HelpCircle,
+  Sliders,
+  Key,
+  Check,
+  Loader2,
+  RefreshCw,
+  ExternalLink
 } from "lucide-react";
-import { AIVerificationJob, User, getFileUrl } from "@/lib/api";
+import { AIVerificationJob, User, getFileUrl, api } from "@/lib/api";
 
 interface AIVerificationCenterProps {
   queue: AIVerificationJob[];
   currentUser: User | null;
   onReviewSubmit: (jobId: number, decision: string, notes?: string, overrideReason?: string) => void;
   onSelectTicket: (ticketId: number) => void;
+  onRefreshQueue?: () => void;
 }
 
 export function AIVerificationCenter({
@@ -30,6 +39,7 @@ export function AIVerificationCenter({
   currentUser,
   onReviewSubmit,
   onSelectTicket,
+  onRefreshQueue,
 }: AIVerificationCenterProps) {
   const [selectedJob, setSelectedJob] = useState<AIVerificationJob | null>(queue[0] || null);
   const [reviewDecision, setReviewDecision] = useState<string>("");
@@ -37,6 +47,112 @@ export function AIVerificationCenter({
   const [overrideReason, setOverrideReason] = useState("");
   const [showOverridePrompt, setShowOverridePrompt] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<string>("");
+
+  // AI Connection & Configuration Modal State
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [activeProvider, setActiveProvider] = useState<string>("gemini");
+  const [activeModel, setActiveModel] = useState<string>("gemini-2.0-flash");
+  const [supportedProviders, setSupportedProviders] = useState<any[]>([]);
+  const [apiKeyInput, setApiKeyInput] = useState<string>("");
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>("");
+
+  // Live Analysis Trigger State
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [analysisError, setAnalysisError] = useState<string>("");
+
+  // Keep selectedJob synced if queue updates
+  useEffect(() => {
+    if (selectedJob) {
+      const match = queue.find((q) => q.id === selectedJob.id);
+      if (match) setSelectedJob(match);
+    } else if (queue.length > 0) {
+      setSelectedJob(queue[0]);
+    }
+  }, [queue]);
+
+  // Load configured AI models on mount
+  useEffect(() => {
+    loadAIModels();
+  }, []);
+
+  const loadAIModels = async () => {
+    try {
+      const res = await api.getAIModels();
+      if (res && res.supported_providers) {
+        setSupportedProviders(res.supported_providers);
+        setActiveProvider(res.active_provider || "gemini");
+        setActiveModel(res.active_model || "gemini-2.0-flash");
+      }
+    } catch (err) {
+      console.warn("Could not load AI models catalog:", err);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setIsTestingKey(true);
+    setTestResult(null);
+    try {
+      const res = await api.testAIConnection({
+        provider: activeProvider,
+        model_name: activeModel,
+        api_key: apiKeyInput.trim() || undefined,
+      });
+      setTestResult({
+        success: res.success,
+        message: res.message || (res.success ? "Connection verified!" : "Failed to connect."),
+      });
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err.message || "Failed to reach AI provider API.",
+      });
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
+
+  const handleSaveAIConfig = async () => {
+    setIsSavingConfig(true);
+    setSaveSuccessMsg("");
+    try {
+      await api.configureAIModel(activeProvider, activeModel, apiKeyInput.trim() || undefined);
+      setSaveSuccessMsg(`AI Model set to ${activeProvider.toUpperCase()} (${activeModel})!`);
+      setApiKeyInput("");
+      await loadAIModels();
+      setTimeout(() => {
+        setShowConfigModal(false);
+        setSaveSuccessMsg("");
+        setTestResult(null);
+      }, 1200);
+    } catch (err: any) {
+      alert("Error configuring AI model: " + (err.message || err));
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleTriggerAnalysis = async () => {
+    if (!selectedJob) return;
+    setIsAnalyzing(true);
+    setAnalysisError("");
+    try {
+      const res = await api.triggerAIAnalysis(selectedJob.ticket_id);
+      if (res && res.id) {
+        setSelectedJob(res);
+      }
+      if (onRefreshQueue) {
+        onRefreshQueue();
+      }
+    } catch (err: any) {
+      setAnalysisError(err.message || "Failed to analyze evidence with AI.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const handleDecisionClick = (decision: string) => {
     if (!selectedJob) return;
@@ -64,6 +180,9 @@ export function AIVerificationCenter({
     setReviewNotes("");
   };
 
+  const activeProviderObj = supportedProviders.find((p) => p.provider === activeProvider);
+  const currentProviderObj = supportedProviders.find((p) => p.is_active);
+
   return (
     <div className="p-5 sm:p-6 space-y-5 max-w-7xl mx-auto">
       {/* Page Header */}
@@ -78,12 +197,35 @@ export function AIVerificationCenter({
             </h1>
           </div>
           <p className="text-xs text-[#667085] mt-0.5">
-            Multimodal before-and-after evidence analysis & supervisor sign-off queue
+            Multimodal video motion & before-and-after photo evidence verification for hospital engineering
           </p>
         </div>
+
+        {/* AI Connection Status & Config Button */}
         <div className="flex items-center gap-3 text-xs">
-          <span className="px-2.5 py-1 rounded-full bg-[#E8F3F1] text-[#176B63] font-semibold">
-            {queue.length} Verification Jobs in Queue
+          <button
+            onClick={() => {
+              setShowConfigModal(true);
+              setTestResult(null);
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#A7D7D1] bg-[#F4FAF9] hover:bg-[#E8F3F1] text-[#176B63] font-semibold transition-all shadow-xs"
+            title="Configure Gemini or OpenAI vision & video models"
+          >
+            <Sliders className="h-3.5 w-3.5 text-[#176B63]" />
+            <span>AI Model:</span>
+            <span className="font-bold text-[#17212F] capitalize">
+              {currentProviderObj?.label || activeProvider}
+            </span>
+            <span
+              className={`h-2 w-2 rounded-full ${
+                currentProviderObj?.is_key_configured ? "bg-[#16805D] animate-pulse" : "bg-[#B7791F]"
+              }`}
+              title={currentProviderObj?.is_key_configured ? "API Key Connected" : "Sandbox / Key Missing"}
+            />
+          </button>
+
+          <span className="px-2.5 py-1.5 rounded-full bg-[#E8F3F1] text-[#176B63] font-semibold">
+            {queue.length} Verification Jobs
           </span>
         </div>
       </div>
@@ -167,26 +309,55 @@ export function AIVerificationCenter({
             <div className="space-y-6">
               {/* Evidence Side-by-Side Comparison Workspace */}
               <div className="bg-white rounded-xl border border-[#E5E9EF] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-[#E5E9EF]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E5E9EF]">
                   <div>
                     <h3 className="text-sm font-bold text-[#17212F] flex items-center gap-2">
-                      <span>Evidence Comparison: {selectedJob.ticket_number}</span>
+                      <span>Evidence Inspection: {selectedJob.ticket_number}</span>
                       <span className="text-xs font-normal text-[#667085]">
                         ({selectedJob.room_number})
                       </span>
                     </h3>
                     <p className="text-xs text-[#667085]">
-                      Side-by-side pre-repair baseline vs post-repair functional state
+                      Side-by-side pre-repair baseline vs post-repair functional verification video/photo
                     </p>
                   </div>
-                  <button
-                    onClick={() => onSelectTicket(selectedJob.ticket_id)}
-                    className="text-xs font-semibold text-[#176B63] hover:underline flex items-center gap-1"
-                  >
-                    <span>View Ticket Details</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* Live AI Analyze Button */}
+                    <button
+                      onClick={handleTriggerAnalysis}
+                      disabled={isAnalyzing}
+                      className="px-3 py-1.5 rounded-lg bg-[#176B63] hover:bg-[#11534D] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-60"
+                      title="Run multimodal AI analysis on video and photo evidence"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Analyzing Video...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span>Analyze with AI</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => onSelectTicket(selectedJob.ticket_id)}
+                      className="text-xs font-semibold text-[#176B63] hover:underline flex items-center gap-1 ml-1"
+                    >
+                      <span>Ticket Details</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
+
+                {analysisError && (
+                  <div className="p-3 bg-[#FDF2F2] rounded-lg border border-[#F5C2C7] text-xs text-[#C43D4B] flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>{analysisError}</span>
+                  </div>
+                )}
 
                 {/* 2-Column Comparison Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -202,15 +373,15 @@ export function AIVerificationCenter({
                       </span>
                     </div>
 
-                    <div className="h-52 bg-slate-900 rounded-lg flex items-center justify-center overflow-hidden border border-[#E5E9EF] relative">
-                      {selectedJob.before_evidence?.media_type === "video" ? (
-                        <div className="text-center p-4 text-white">
-                          <Film className="h-8 w-8 text-[#176B63] mx-auto mb-2" />
-                          <span className="text-xs font-mono block">Fault Video Stream</span>
-                          <span className="text-[10px] text-slate-400">
-                            Pre-repair non-rotating equipment
-                          </span>
-                        </div>
+                    <div className="h-60 bg-black rounded-lg flex items-center justify-center overflow-hidden border border-[#E5E9EF] relative">
+                      {selectedJob.before_evidence?.media_type === "video" ||
+                      selectedJob.before_evidence?.file_url?.match(/\.(mp4|webm|mov)$/i) ? (
+                        <video
+                          src={getFileUrl(selectedJob.before_evidence.file_url)}
+                          controls
+                          playsInline
+                          className="w-full h-full object-contain bg-black"
+                        />
                       ) : selectedJob.before_evidence?.file_url ? (
                         <img
                           src={getFileUrl(selectedJob.before_evidence.file_url)}
@@ -240,6 +411,19 @@ export function AIVerificationCenter({
                         <span>Reported Condition:</span>
                         <strong className="text-[#C43D4B]">Non-functional / Fault Present</strong>
                       </div>
+                      {selectedJob.before_evidence?.file_url && (
+                        <div className="pt-1 text-right">
+                          <a
+                            href={getFileUrl(selectedJob.before_evidence.file_url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#176B63] hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            <span>View Full Artifact</span>
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -247,23 +431,23 @@ export function AIVerificationCenter({
                   <div className="bg-[#F7F8FA] rounded-xl border border-[#E5E9EF] p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider text-[#667085]">
-                        <Film className="h-3.5 w-3.5 text-[#16805D]" />
+                        <Video className="h-3.5 w-3.5 text-[#16805D]" />
                         <span>After Repair</span>
                       </div>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#EDF7F2] text-[#16805D]">
-                        Verification Artifact
+                        Verification Video / Photo
                       </span>
                     </div>
 
-                    <div className="h-52 bg-slate-900 rounded-lg flex items-center justify-center overflow-hidden border border-[#E5E9EF] relative">
-                      {selectedJob.after_evidence?.media_type === "video" ? (
-                        <div className="text-center p-4 text-white">
-                          <Play className="h-8 w-8 text-[#16805D] mx-auto mb-2 animate-pulse" />
-                          <span className="text-xs font-mono block">Operational Verification Video</span>
-                          <span className="text-[10px] text-slate-400">
-                            Dynamic motion / rotation verified
-                          </span>
-                        </div>
+                    <div className="h-60 bg-black rounded-lg flex items-center justify-center overflow-hidden border border-[#E5E9EF] relative">
+                      {selectedJob.after_evidence?.media_type === "video" ||
+                      selectedJob.after_evidence?.file_url?.match(/\.(mp4|webm|mov)$/i) ? (
+                        <video
+                          src={getFileUrl(selectedJob.after_evidence.file_url)}
+                          controls
+                          playsInline
+                          className="w-full h-full object-contain bg-black"
+                        />
                       ) : selectedJob.after_evidence?.file_url ? (
                         <img
                           src={getFileUrl(selectedJob.after_evidence.file_url)}
@@ -284,7 +468,7 @@ export function AIVerificationCenter({
 
                     <div className="text-xs text-[#667085] space-y-1">
                       <div className="flex justify-between">
-                        <span>Observed Behavior:</span>
+                        <span>Observed Dynamics:</span>
                         <strong className="text-[#16805D] capitalize">
                           {selectedJob.after_repair_functional_evidence.replace("_", " ")}
                         </strong>
@@ -295,6 +479,19 @@ export function AIVerificationCenter({
                           {selectedJob.media_quality.replace("_", " ")}
                         </strong>
                       </div>
+                      {selectedJob.after_evidence?.file_url && (
+                        <div className="pt-1 text-right">
+                          <a
+                            href={getFileUrl(selectedJob.after_evidence.file_url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#176B63] hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            <span>View Full Artifact</span>
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -312,7 +509,7 @@ export function AIVerificationCenter({
                         Structured AI Diagnostic Evaluation
                       </h4>
                       <span className="text-[10px] text-[#667085]">
-                        Model: {selectedJob.model_version} • Indian Healthcare Operations Protocol
+                        Model: {selectedJob.model_version || `${selectedJob.provider_selected}:${selectedJob.model_name_selected}`} • Clinical Operations Protocol
                       </span>
                     </div>
                   </div>
@@ -354,7 +551,7 @@ export function AIVerificationCenter({
                   </div>
                   <div className="bg-white p-3 rounded-lg border border-[#E5E9EF]">
                     <span className="text-[#667085] text-[10px] uppercase font-bold block mb-0.5">
-                      Operational Flow
+                      Operational Flow / Motion
                     </span>
                     <strong className="text-[#17212F] capitalize">
                       {selectedJob.after_repair_functional_evidence.replace("_", " ")}
@@ -372,7 +569,7 @@ export function AIVerificationCenter({
 
                 {/* Analysis Notes */}
                 <div className="p-3 bg-white rounded-lg border border-[#E5E9EF] text-xs text-[#17212F] leading-relaxed">
-                  <span className="font-bold text-[#176B63] block mb-1">AI Recommendation Context:</span>
+                  <span className="font-bold text-[#176B63] block mb-1">AI Recommendation & Video Analysis Context:</span>
                   <p>{selectedJob.analysis_notes}</p>
                 </div>
               </div>
@@ -448,6 +645,195 @@ export function AIVerificationCenter({
           )}
         </div>
       </div>
+
+      {/* AI Model & Key Connection Modal */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 border border-[#E5E9EF] shadow-2xl space-y-5 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E5E9EF]">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-[#E8F3F1] text-[#176B63]">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[#17212F]">
+                    Connect AI for Video & Visual Verification
+                  </h3>
+                  <p className="text-[11px] text-[#667085]">
+                    Select multimodal provider and configure your API key for video analysis
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="text-[#667085] hover:text-[#17212F] p-1 rounded-md text-base leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Provider Selection */}
+            <div className="space-y-2">
+              <label className="font-semibold text-[#17212F] block">Select AI Vision & Video Provider:</label>
+              <div className="grid grid-cols-2 gap-2">
+                {supportedProviders.map((prov) => {
+                  const isChosen = activeProvider === prov.provider;
+                  return (
+                    <button
+                      key={prov.provider}
+                      type="button"
+                      onClick={() => {
+                        setActiveProvider(prov.provider);
+                        setActiveModel(prov.models[0]);
+                        setTestResult(null);
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        isChosen
+                          ? "border-[#176B63] bg-[#E8F3F1]/40 ring-1 ring-[#176B63]"
+                          : "border-[#E5E9EF] bg-white hover:bg-[#F7F8FA]"
+                      }`}
+                    >
+                      <div className="font-bold text-xs text-[#17212F] flex items-center justify-between">
+                        <span>{prov.label}</span>
+                        {prov.is_key_configured && (
+                          <span className="h-2 w-2 rounded-full bg-[#16805D]" title="Key configured" />
+                        )}
+                      </div>
+                      <span className="text-[10px] text-[#667085] line-clamp-2 mt-1 block">
+                        {prov.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Model Selection for chosen provider */}
+            {activeProviderObj && activeProviderObj.models && (
+              <div className="space-y-1.5">
+                <label className="font-semibold text-[#17212F] block">AI Model:</label>
+                <select
+                  value={activeModel}
+                  onChange={(e) => setActiveModel(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-[#E5E9EF] bg-white text-xs text-[#17212F] focus:outline-none focus:border-[#176B63]"
+                >
+                  {activeProviderObj.models.map((m: string) => (
+                    <option key={m} value={m}>
+                      {m} {m === "gemini-2.0-flash" ? "(Recommended for fast video motion analysis)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* API Key Input */}
+            {activeProvider !== "mock" && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-[#17212F]">
+                    {activeProvider === "gemini" ? "Google Gemini API Key" : "OpenAI API Key"}:
+                  </label>
+                  {activeProviderObj?.is_key_configured && (
+                    <span className="text-[10px] font-semibold text-[#16805D] flex items-center gap-1">
+                      <Check className="h-3 w-3" /> Key Saved on Server
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? "text" : "password"}
+                    placeholder={
+                      activeProviderObj?.is_key_configured
+                        ? "•••••••••••••••••••••••• (Leave blank to keep existing)"
+                        : activeProvider === "gemini"
+                        ? "Enter your Google Gemini API Key (AIza...)"
+                        : "Enter your OpenAI API Key (sk-...)"
+                    }
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    className="w-full p-2.5 pr-10 rounded-lg border border-[#E5E9EF] focus:outline-none focus:border-[#176B63] font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-2.5 top-2.5 text-[#667085] hover:text-[#17212F]"
+                  >
+                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-[#667085]">
+                  Get free Google Gemini API keys at{" "}
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#176B63] underline font-semibold"
+                  >
+                    Google AI Studio
+                  </a>
+                  . Keys are stored securely in backend system settings.
+                </p>
+              </div>
+            )}
+
+            {/* Connection Test Status Message */}
+            {testResult && (
+              <div
+                className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
+                  testResult.success
+                    ? "bg-[#EDF7F2] border-[#A6E1CE] text-[#16805D]"
+                    : "bg-[#FDF2F2] border-[#F5C2C7] text-[#C43D4B]"
+                }`}
+              >
+                {testResult.success ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                )}
+                <span>{testResult.message}</span>
+              </div>
+            )}
+
+            {saveSuccessMsg && (
+              <div className="p-3 bg-[#EDF7F2] border border-[#A6E1CE] text-xs text-[#16805D] rounded-lg flex items-center gap-2">
+                <Check className="h-4 w-4 shrink-0" />
+                <span>{saveSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-[#E5E9EF]">
+              <button
+                type="button"
+                onClick={handleTestConnection}
+                disabled={isTestingKey}
+                className="px-3 py-1.5 rounded-lg border border-[#E5E9EF] hover:bg-[#F7F8FA] font-semibold text-[#17212F] flex items-center gap-1.5 transition-all disabled:opacity-50"
+              >
+                {isTestingKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Key className="h-3.5 w-3.5" />}
+                <span>Test Connection</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConfigModal(false)}
+                  className="px-3 py-1.5 rounded-lg border border-[#E5E9EF] text-[#667085] hover:text-[#17212F]"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveAIConfig}
+                  disabled={isSavingConfig}
+                  className="px-4 py-1.5 rounded-lg bg-[#176B63] hover:bg-[#11534D] text-white font-semibold transition-all disabled:opacity-50"
+                >
+                  {isSavingConfig ? "Saving..." : "Save & Set Default"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mandatory Override Rationale Modal */}
       {showOverridePrompt && (

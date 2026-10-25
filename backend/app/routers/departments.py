@@ -455,10 +455,29 @@ def delete_department(
 
 @router.get("/{department_id}/staff")
 def get_department_staff(department_id: str, db: Session = Depends(get_db)):
-    staff = db.query(User).filter(
+    dept = db.query(Department).filter(Department.id == department_id).first()
+    
+    # 1. Staff and supervisors belonging to this department
+    users_query = db.query(User).filter(
         User.department_id == department_id,
-        User.is_active == True
-    ).all()
+        User.is_active == True,
+        User.role.in_(["staff", "supervisor"])
+    ).filter(
+        ~User.name.ilike('%Test%'),
+        ~User.name.ilike('%Hacker%')
+    )
+    dept_users = users_query.all()
+    
+    # 2. Check if primary department supervisor is linked
+    all_users = list(dept_users)
+    if dept and dept.supervisor_id:
+        sup = db.query(User).filter(User.id == dept.supervisor_id, User.is_active == True).first()
+        if sup and sup not in all_users:
+            all_users.append(sup)
+            
+    # Sort: Supervisors first, then staff by name
+    all_users.sort(key=lambda u: (0 if u.role == "supervisor" else 1, u.name))
+    
     return [
         {
             "id": s.id,
@@ -467,9 +486,10 @@ def get_department_staff(department_id: str, db: Session = Depends(get_db)):
             "role": s.role,
             "phone": s.phone,
             "employee_id": s.employee_id,
-            "designation": s.designation
+            "designation": s.designation,
+            "is_supervisor": s.role == "supervisor"
         }
-        for s in staff
+        for s in all_users
     ]
 
 def to_utc(dt):

@@ -12,44 +12,137 @@ from app.models import Ticket, Evidence
 
 logger = logging.getLogger("careops.ai_vision")
 
+import subprocess
+import tempfile
+import glob
+
 class AIVisionService:
     @staticmethod
     def get_supported_models() -> List[Dict[str, Any]]:
         """Returns the list of enterprise vision providers and supported models"""
         return [
             {
-                "provider": "openai",
-                "label": "OpenAI Vision",
-                "models": ["gpt-4o", "gpt-4o-mini"],
+                "provider": "gemini",
+                "label": "Google Gemini Vision & Video",
+                "models": ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"],
                 "supports_video_frames": True,
+                "supports_video_native": True,
                 "supports_images": True,
-                "requires_api_key": True
+                "requires_api_key": True,
+                "description": "Native multimodal understanding for high-frame video recordings (.mp4, .webm) and photos"
             },
             {
-                "provider": "gemini",
-                "label": "Google Gemini Vision",
-                "models": ["gemini-1.5-flash", "gemini-1.5-pro"],
+                "provider": "openai",
+                "label": "OpenAI Vision (GPT-4o)",
+                "models": ["gpt-4o", "gpt-4o-mini"],
                 "supports_video_frames": True,
+                "supports_video_native": False,
                 "supports_images": True,
-                "requires_api_key": True
+                "requires_api_key": True,
+                "description": "Temporal multi-frame video extraction & high-precision visual inspection"
             },
             {
                 "provider": "anthropic",
                 "label": "Anthropic Claude Vision",
                 "models": ["claude-3-5-sonnet", "claude-3-haiku"],
-                "supports_video_frames": False,
+                "supports_video_frames": True,
+                "supports_video_native": False,
                 "supports_images": True,
-                "requires_api_key": True
+                "requires_api_key": True,
+                "description": "High-detail multi-image and frame inspection"
             },
             {
                 "provider": "mock",
                 "label": "CareOps Deterministic Vision Engine (Sandbox)",
                 "models": ["careops-vision-default", "careops-vision-high-precision"],
                 "supports_video_frames": True,
+                "supports_video_native": True,
                 "supports_images": True,
-                "requires_api_key": False
+                "requires_api_key": False,
+                "description": "Zero-config offline testing with mechanical motion consistency checking"
             }
         ]
+
+    @staticmethod
+    def test_connection(provider: str, model_name: Optional[str], api_key: str) -> tuple[bool, str]:
+        """Validates provider API key connectivity with a lightweight ping"""
+        if not api_key or not api_key.strip():
+            return False, "API key cannot be empty."
+
+        clean_key = api_key.strip()
+        provider = provider.lower()
+
+        try:
+            if provider == "gemini":
+                model = model_name or "gemini-3.5-flash"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={clean_key}"
+                payload = {
+                    "contents": [{"parts": [{"text": "Respond with the single word: OK"}]}],
+                    "generationConfig": {"maxOutputTokens": 5}
+                }
+                with httpx.Client(timeout=10.0) as client:
+                    res = client.post(url, json=payload)
+                    if res.status_code == 200:
+                        return True, f"Google Gemini ({model}) connected successfully!"
+                    else:
+                        error_detail = res.text[:200]
+                        return False, f"Gemini API returned status {res.status_code}: {error_detail}"
+
+            elif provider == "openai":
+                model = model_name or "gpt-4o-mini"
+                url = "https://api.openai.com/v1/chat/completions"
+                payload = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": "ping"}],
+                    "max_tokens": 5
+                }
+                headers = {"Authorization": f"Bearer {clean_key}", "Content-Type": "application/json"}
+                with httpx.Client(timeout=10.0) as client:
+                    res = client.post(url, headers=headers, json=payload)
+                    if res.status_code == 200:
+                        return True, f"OpenAI ({model}) connected successfully!"
+                    else:
+                        error_detail = res.text[:200]
+                        return False, f"OpenAI API returned status {res.status_code}: {error_detail}"
+
+            elif provider == "mock":
+                return True, "CareOps Deterministic Vision Engine is ready."
+
+            return False, f"Provider '{provider}' test not supported."
+        except Exception as e:
+            return False, f"Connection test failed: {str(e)}"
+
+    @staticmethod
+    def _extract_video_keyframes(video_path: Path, max_frames: int = 5) -> List[tuple[str, str]]:
+        """
+        Extracts up to `max_frames` evenly spaced keyframes from a video file using ffmpeg.
+        Returns a list of tuples: (base64_encoded_jpeg, 'image/jpeg').
+        """
+        if not video_path.exists():
+            return []
+
+        frames = []
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                output_pattern = str(Path(tmpdir) / "frame_%03d.jpg")
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(video_path),
+                    "-vf", "fps=1,scale=720:-1",
+                    "-vframes", str(max_frames),
+                    "-q:v", "3",
+                    output_pattern
+                ]
+                res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                if res.returncode == 0:
+                    found_files = sorted(glob.glob(str(Path(tmpdir) / "frame_*.jpg")))
+                    for fpath in found_files:
+                        with open(fpath, "rb") as f:
+                            b64 = base64.b64encode(f.read()).decode("utf-8")
+                            frames.append((b64, "image/jpeg"))
+        except Exception as e:
+            logger.warning(f"ffmpeg frame extraction failed for {video_path}: {e}")
+        return frames
 
     @staticmethod
     def _get_local_file_path(file_url: str) -> Optional[Path]:
@@ -63,13 +156,13 @@ class AIVisionService:
         return None
 
     @staticmethod
-    def _load_media_base64(evidence: Optional[Evidence]) -> tuple[Optional[str], Optional[str]]:
+    def _load_media_base64(evidence: Optional[Evidence]) -> tuple[Optional[str], Optional[str], Optional[Path]]:
         """Loads and encodes media file as base64 and determines mime type"""
         if not evidence or not evidence.file_url:
-            return None, None
+            return None, None, None
         path = AIVisionService._get_local_file_path(evidence.file_url)
         if not path or not path.exists():
-            return None, None
+            return None, None, None
 
         mime, _ = mimetypes.guess_type(str(path))
         if not mime:
@@ -77,20 +170,23 @@ class AIVisionService:
                 mime = "video/mp4"
             elif str(path).lower().endswith(".webm"):
                 mime = "video/webm"
+            elif str(path).lower().endswith(".mov"):
+                mime = "video/quicktime"
             else:
                 mime = "image/jpeg"
 
         try:
-            # Limit file size for inline API transmission (max 20MB for Gemini, 10MB for OpenAI)
-            if path.stat().st_size > 20 * 1024 * 1024:
-                logger.warning(f"Media file {path} exceeds 20MB limit for direct inline API transmission.")
-                return None, None
+            # Check file size
+            file_size = path.stat().st_size
+            if file_size > 20 * 1024 * 1024:
+                logger.info(f"Media file {path} exceeds 20MB ({file_size} bytes). Keyframe extraction will be used for video.")
+                return None, mime, path
             with open(path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode("utf-8")
-            return b64, mime
+            return b64, mime, path
         except Exception as e:
             logger.error(f"Error encoding media {path}: {e}")
-            return None, None
+            return None, None, path
 
     @staticmethod
     def _call_gemini_vision(
@@ -100,49 +196,73 @@ class AIVisionService:
         model_name: str,
         api_key: str
     ) -> Optional[Dict[str, Any]]:
-        """Invokes Google Gemini 1.5 Multimodal REST API with native image and video support"""
+        """
+        Invokes Google Gemini Multimodal REST API with native video and multi-image support.
+        Supports continuous video analysis (ceiling fan rotation, fluid leaks, appliance vibration).
+        """
         try:
             # Build prompt
             prompt_text = (
-                f"You are a clinical hospital facility engineering AI inspector. "
-                f"Analyze before-and-after maintenance evidence for ticket:\n"
+                f"You are a clinical hospital facility engineering AI inspector.\n"
+                f"Analyze the submitted maintenance evidence (photographs or operational video recordings) for ticket:\n"
+                f"- Ticket Number: {ticket.ticket_number}\n"
                 f"- Category: {ticket.category}\n"
                 f"- Title: {ticket.title}\n"
-                f"- Complaint Description: {ticket.description}\n"
+                f"- Reported Complaint: {ticket.description}\n"
                 f"- Location: Room {ticket.room_number}\n\n"
-                f"Inspect the before and after evidence carefully (images or video). "
-                f"Note: Dynamic equipment like ceiling fans, motors, or water faucets require operational movement confirmation.\n"
+                f"VIDEO & MOTION INSPECTION INSTRUCTIONS:\n"
+                f"1. Examine the after-repair evidence carefully. If it is a video, inspect temporal physical movement:\n"
+                f"   - For rotating equipment (ceiling fans, exhaust fans, motors, pumps): Verify if continuous rotation is active and unobstructed.\n"
+                f"   - For plumbing/faucets: Verify if leaks have ceased and water flows/drains properly without pooling.\n"
+                f"   - For electrical/fixtures: Verify if illumination or status indicators are functional and safe.\n"
+                f"2. If the equipment requires operational motion but only a static photo was provided, flag as 'static_unverified' and 'inconclusive'.\n"
+                f"3. Compare the baseline fault (before) against the post-repair condition (after).\n\n"
                 f"Return ONLY valid JSON matching this schema:\n"
                 f'{{"equipment_match": "confirmed_match"|"likely_match"|"mismatch"|"inconclusive", '
                 f'"visible_fault_assessment": "fault_cleared"|"fault_detected"|"ambiguous", '
                 f'"after_repair_functional_evidence": "movement_observed"|"functional_normal"|"static_unverified"|"inconclusive", '
                 f'"ai_recommendation": "likely_resolved"|"likely_unresolved"|"inconclusive", '
                 f'"confidence_score": 0.0-1.0, '
-                f'"analysis_notes": "detailed observations", '
-                f'"recommended_next_action": "action advice"}}'
+                f'"analysis_notes": "detailed visual and temporal observations of the equipment and video/photo state", '
+                f'"recommended_next_action": "action advice for hospital supervisor"}}'
             )
 
             parts: list[dict] = [{"text": prompt_text}]
 
             # Add before evidence
             if before_evidence:
-                b64, mime = AIVisionService._load_media_base64(before_evidence)
+                parts.append({"text": "[PRE-REPAIR BASELINE EVIDENCE]"})
+                b64, mime, fpath = AIVisionService._load_media_base64(before_evidence)
                 if b64 and mime:
                     parts.append({"inline_data": {"mime_type": mime, "data": b64}})
+                elif fpath and mime and mime.startswith("video/"):
+                    # Large video: extract keyframes
+                    keyframes = AIVisionService._extract_video_keyframes(fpath, max_frames=4)
+                    for k_idx, (kb64, kmime) in enumerate(keyframes):
+                        parts.append({"text": f"[Before-Repair Video Frame {k_idx+1}]"})
+                        parts.append({"inline_data": {"mime_type": kmime, "data": kb64}})
 
             # Add after evidence
             if after_evidence:
-                b64, mime = AIVisionService._load_media_base64(after_evidence)
+                parts.append({"text": "[POST-REPAIR VERIFICATION EVIDENCE]"})
+                b64, mime, fpath = AIVisionService._load_media_base64(after_evidence)
                 if b64 and mime:
                     parts.append({"inline_data": {"mime_type": mime, "data": b64}})
+                elif fpath and mime and mime.startswith("video/"):
+                    # Large video: extract keyframes
+                    keyframes = AIVisionService._extract_video_keyframes(fpath, max_frames=5)
+                    for k_idx, (kb64, kmime) in enumerate(keyframes):
+                        parts.append({"text": f"[Post-Repair Video Frame {k_idx+1} (Temporal Observation)]"})
+                        parts.append({"inline_data": {"mime_type": kmime, "data": kb64}})
 
             payload = {
                 "contents": [{"parts": parts}],
                 "generationConfig": {"temperature": 0.2, "response_mime_type": "application/json"}
             }
 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-            with httpx.Client(timeout=30.0) as client:
+            model = model_name if model_name in ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"] else "gemini-3.5-flash"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            with httpx.Client(timeout=45.0) as client:
                 res = client.post(url, json=payload)
                 if res.status_code == 200:
                     data = res.json()
@@ -166,14 +286,19 @@ class AIVisionService:
         model_name: str,
         api_key: str
     ) -> Optional[Dict[str, Any]]:
-        """Invokes OpenAI GPT-4o Multimodal Chat Completions API"""
+        """
+        Invokes OpenAI GPT-4o Multimodal Chat Completions API.
+        Extracts temporal keyframes from video files to enable full video motion analysis in GPT-4o.
+        """
         try:
             content_items: list[dict] = [
                 {
                     "type": "text",
                     "text": (
-                        f"Hospital Facility AI Inspector. Analyze maintenance repair evidence:\n"
-                        f"Category: {ticket.category}, Title: {ticket.title}, Desc: {ticket.description}, Room: {ticket.room_number}.\n"
+                        f"Hospital Facility AI Inspector. Analyze maintenance repair evidence (images or extracted video frames):\n"
+                        f"- Ticket: {ticket.ticket_number}\n"
+                        f"- Category: {ticket.category}, Title: {ticket.title}, Description: {ticket.description}, Location: Room {ticket.room_number}.\n"
+                        f"If video frames are provided, inspect temporal motion (e.g. rotation of fan, water flow, motor activity).\n"
                         f"Respond with JSON: equipment_match, visible_fault_assessment, after_repair_functional_evidence, "
                         f"ai_recommendation, confidence_score (0-1), analysis_notes, recommended_next_action."
                     )
@@ -181,24 +306,39 @@ class AIVisionService:
             ]
 
             if before_evidence:
-                b64, mime = AIVisionService._load_media_base64(before_evidence)
+                b64, mime, fpath = AIVisionService._load_media_base64(before_evidence)
                 if b64 and mime and mime.startswith("image/"):
+                    content_items.append({"type": "text", "text": "[Baseline Pre-Repair Photo]"})
                     content_items.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+                elif fpath:
+                    # Video before evidence: extract keyframes
+                    keyframes = AIVisionService._extract_video_keyframes(fpath, max_frames=3)
+                    for k_idx, (kb64, kmime) in enumerate(keyframes):
+                        content_items.append({"type": "text", "text": f"[Pre-Repair Video Keyframe #{k_idx+1}]"})
+                        content_items.append({"type": "image_url", "image_url": {"url": f"data:{kmime};base64,{kb64}"}})
 
             if after_evidence:
-                b64, mime = AIVisionService._load_media_base64(after_evidence)
+                b64, mime, fpath = AIVisionService._load_media_base64(after_evidence)
                 if b64 and mime and mime.startswith("image/"):
+                    content_items.append({"type": "text", "text": "[Post-Repair Completion Photo]"})
                     content_items.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+                elif fpath:
+                    # Video after evidence: extract keyframes for temporal motion
+                    keyframes = AIVisionService._extract_video_keyframes(fpath, max_frames=5)
+                    for k_idx, (kb64, kmime) in enumerate(keyframes):
+                        content_items.append({"type": "text", "text": f"[Post-Repair Verification Video Keyframe #{k_idx+1} (Temporal Observation)]"})
+                        content_items.append({"type": "image_url", "image_url": {"url": f"data:{kmime};base64,{kb64}"}})
 
+            model = model_name if model_name in ["gpt-4o", "gpt-4o-mini"] else "gpt-4o"
             payload = {
-                "model": model_name,
+                "model": model,
                 "messages": [{"role": "user", "content": content_items}],
                 "response_format": {"type": "json_object"},
                 "temperature": 0.2
             }
 
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=45.0) as client:
                 res = client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
                 if res.status_code == 200:
                     data = res.json()
@@ -211,6 +351,7 @@ class AIVisionService:
         except Exception as e:
             logger.error(f"OpenAI live call error: {e}")
         return None
+
 
     @staticmethod
     def analyze_ticket_evidence(

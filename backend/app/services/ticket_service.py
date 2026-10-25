@@ -263,10 +263,12 @@ class TicketService:
         if not staff:
             raise HTTPException(status_code=404, detail="Selected staff member not found or account is inactive.")
 
-        if staff.department_id != ticket.department_id:
+        dept = db.query(Department).filter(Department.id == ticket.department_id).first()
+        is_dept_supervisor = (dept and dept.supervisor_id == staff.id)
+        if staff.department_id != ticket.department_id and not is_dept_supervisor:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot assign task: Staff member '{staff.name}' belongs to department '{staff.department_id}', not '{ticket.department_id}'."
+                detail=f"Cannot assign task: Member '{staff.name}' belongs to department '{staff.department_id}', not '{ticket.department_id}'."
             )
 
         # 3. Concurrency check

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from app.database import get_db
+from app.config import settings
 from app.models import Ticket, Evidence, AIVerificationJob, User, AuditLog, SystemSecuritySetting
 from app.schemas import AIHumanReviewRequest
 from app.services.auth_service import get_current_user, require_roles, require_permission
@@ -18,10 +19,17 @@ router = APIRouter(prefix="/ai-verify", tags=["AI Verification Center"])
 class AIAnalyzeRequest(BaseModel):
     provider: Optional[str] = None
     model_name: Optional[str] = None
+    api_key: Optional[str] = None
 
 class AIModelConfigureRequest(BaseModel):
     provider: str = Field(..., description="'openai', 'gemini', 'anthropic', or 'mock'")
     model_name: str
+    api_key: Optional[str] = None
+
+class TestConnectionRequest(BaseModel):
+    provider: str
+    model_name: Optional[str] = None
+    api_key: Optional[str] = None
 
 def parse_job_response(job: AIVerificationJob) -> dict:
     # Try to unpack visual observations and differences if stored in analysis_notes or extra json
@@ -69,7 +77,7 @@ def get_model_options(
     # Indicate whether API key is present without exposing the actual secret key
     has_keys = {
         "openai": bool((sec and sec.openai_api_key) or os.getenv("OPENAI_API_KEY") or settings.OPENAI_API_KEY),
-        "gemini": bool((sec and sec.gemini_api_key) or os.getenv("GEMINI_API_KEY")),
+        "gemini": bool((sec and sec.gemini_api_key) or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or settings.GEMINI_API_KEY),
         "anthropic": bool((sec and sec.anthropic_api_key) or os.getenv("ANTHROPIC_API_KEY")),
         "mock": True
     }
@@ -88,10 +96,10 @@ def get_model_options(
 @router.post("/configure-model")
 def configure_model(
     payload: AIModelConfigureRequest,
-    current_user: User = Depends(require_roles("admin", "superadmin")),
+    current_user: User = Depends(require_roles("admin", "superadmin", "supervisor")),
     db: Session = Depends(get_db)
 ):
-    """Configures the hospital's active default AI vision provider and model"""
+    """Configures the hospital's active default AI vision provider, model, and optional API key"""
     sec = db.query(SystemSecuritySetting).filter(SystemSecuritySetting.id == 1).first()
     if not sec:
         sec = SystemSecuritySetting(id=1)
@@ -99,6 +107,16 @@ def configure_model(
 
     sec.ai_vision_provider = payload.provider
     sec.ai_vision_model = payload.model_name
+    
+    if payload.api_key and payload.api_key.strip():
+        clean_key = payload.api_key.strip()
+        if payload.provider == "gemini":
+            sec.gemini_api_key = clean_key
+        elif payload.provider == "openai":
+            sec.openai_api_key = clean_key
+        elif payload.provider == "anthropic":
+            sec.anthropic_api_key = clean_key
+
     db.commit()
 
     return {
@@ -107,6 +125,28 @@ def configure_model(
         "active_provider": sec.ai_vision_provider,
         "active_model": sec.ai_vision_model
     }
+
+@router.post("/test-connection")
+def test_connection_endpoint(
+    payload: TestConnectionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Tests provider API key connectivity to ensure AI video and vision models can analyze evidence"""
+    sec = db.query(SystemSecuritySetting).filter(SystemSecuritySetting.id == 1).first()
+    key = payload.api_key
+    if not key or not key.strip():
+        if payload.provider == "gemini":
+            key = (sec and sec.gemini_api_key) or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or settings.GEMINI_API_KEY
+        elif payload.provider == "openai":
+            key = (sec and sec.openai_api_key) or os.getenv("OPENAI_API_KEY") or settings.OPENAI_API_KEY
+        elif payload.provider == "anthropic":
+            key = (sec and sec.anthropic_api_key) or os.getenv("ANTHROPIC_API_KEY")
+        elif payload.provider == "mock":
+            key = "mock"
+
+    success, message = AIVisionService.test_connection(payload.provider, payload.model_name, key or "")
+    return {"success": success, "message": message}
 
 @router.get("/queue")
 def get_verification_queue(
@@ -177,13 +217,14 @@ def trigger_analysis(
     provider = (payload and payload.provider) or (sec.ai_vision_provider if sec else "mock")
     model_name = (payload and payload.model_name) or (sec.ai_vision_model if sec else "careops-vision-default")
 
-    api_key = None
-    if provider == "openai":
-        api_key = (sec and sec.openai_api_key) or os.getenv("OPENAI_API_KEY") or settings.OPENAI_API_KEY
-    elif provider == "gemini":
-        api_key = (sec and sec.gemini_api_key) or os.getenv("GEMINI_API_KEY")
-    elif provider == "anthropic":
-        api_key = (sec and sec.anthropic_api_key) or os.getenv("ANTHROPIC_API_KEY")
+    api_key = (payload and payload.api_key and payload.api_key.strip()) or None
+    if not api_key:
+        if provider == "openai":
+            api_key = (sec and sec.openai_api_key) or os.getenv("OPENAI_API_KEY") or settings.OPENAI_API_KEY
+        elif provider == "gemini":
+            api_key = (sec and sec.gemini_api_key) or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or settings.GEMINI_API_KEY
+        elif provider == "anthropic":
+            api_key = (sec and sec.anthropic_api_key) or os.getenv("ANTHROPIC_API_KEY")
     
     analysis_data = AIVisionService.analyze_ticket_evidence(
         ticket=ticket,

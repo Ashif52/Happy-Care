@@ -305,7 +305,8 @@ export function StaffAccessManagementView({
 
   const getRoleBadge = (role: string) => {
     const config: Record<string, { label: string; style: string }> = {
-      admin: { label: "Super Admin", style: "bg-[#E8F3F1] text-[#176B63] border-[#99F6E4]" },
+      superadmin: { label: "Super Admin", style: "bg-[#FCE7F3] text-[#9D174D] border-[#F472B6]" },
+      admin: { label: "Admin", style: "bg-[#E8F3F1] text-[#176B63] border-[#99F6E4]" },
       it_admin: { label: "IT Administrator", style: "bg-[#EEF4FD] text-[#3868C9] border-[#BFDBFE]" },
       supervisor: { label: "Supervisor", style: "bg-[#FEF7EC] text-[#B7791F] border-[#FAD7A0]" },
       doctor: { label: "Physician", style: "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]" },
@@ -587,7 +588,8 @@ export function StaffAccessManagementView({
                   className="w-full px-3 py-2.5 rounded-xl border-2 border-[#CBD5E1] bg-[#F8FAFC] text-sm font-bold text-[#0F172A] focus:outline-none focus:border-[#176B63]"
                 >
                   <option value="all">All Roles</option>
-                  <option value="admin">Super Admin</option>
+                  <option value="admin">Admin</option>
+                  <option value="superadmin">Super Admin</option>
                   <option value="it_admin">IT Administrator</option>
                   <option value="supervisor">Department Head</option>
                   <option value="doctor">Physician / Doctor</option>

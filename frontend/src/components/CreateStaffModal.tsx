@@ -117,7 +117,7 @@ export function CreateStaffModal({
     { id: "housekeeping", label: "Housekeeping & Sanitation Lead", dept: "Sanitation" },
     { id: "reception", label: "Reception & Admissions Staff", dept: "Front Desk" },
     { id: "auditor", label: "Compliance & Quality Auditor", dept: "Governance" },
-    { id: "admin", label: "Hospital Super Administrator", dept: "Executive" },
+    { id: "admin", label: "Hospital Administrator", dept: "Executive" },
   ];
 
   return (

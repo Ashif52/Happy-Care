@@ -17,6 +17,7 @@ import {
   Smartphone
 } from "lucide-react";
 import { QRCodeSVG, QRCodeCanvas } from "qrcode.react";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface HospitalFeedbackQRModalProps {
   isOpen: boolean;
@@ -36,12 +37,10 @@ export function HospitalFeedbackQRModal({ isOpen, onClose }: HospitalFeedbackQRM
 
   if (!isOpen) return null;
 
-  const handleCopyLink = () => {
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(feedbackURL);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleCopyLink = async () => {
+    await copyToClipboard(feedbackURL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handlePrint = () => {

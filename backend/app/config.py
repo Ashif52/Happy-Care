@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     REVIEW_ALERT_STAR_THRESHOLD: int = 3  # Strictly below 3 stars (< 3): 1 star (critical), 2 star (high)
     REVIEW_SYNC_INTERVAL_MINUTES: int = 15
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
 
     # SMTPS & Maintenance Department Escalation Dispatch
     WORK_EMAIL: str = os.getenv("WORK_EMAIL", "")  # Work email configured for operational escalations

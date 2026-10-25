@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { StaffMember, api, formatDateTime } from "@/lib/api";
 import { PermissionMatrixModal } from "@/components/common/PermissionMatrixModal";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface StaffDetailDrawerProps {
   staff: StaffMember | null;
@@ -221,8 +222,8 @@ export function StaffDetailDrawer({
 
   if (!staff) return null;
 
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, label: string) => {
+    await copyToClipboard(text);
     setCopiedText(label);
     setTimeout(() => setCopiedText(null), 2000);
   };

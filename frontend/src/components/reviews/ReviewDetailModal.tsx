@@ -22,6 +22,7 @@ import {
   Info
 } from "lucide-react";
 import { GoogleReview, User, api } from "@/lib/api";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface ReviewDetailModalProps {
   review: GoogleReview;
@@ -101,9 +102,9 @@ export function ReviewDetailModal({
     }
   };
 
-  const handleCopyDraft = () => {
+  const handleCopyDraft = async () => {
     if (!replyDraft) return;
-    navigator.clipboard.writeText(replyDraft);
+    await copyToClipboard(replyDraft);
     setCopiedDraft(true);
     setTimeout(() => setCopiedDraft(false), 2000);
   };

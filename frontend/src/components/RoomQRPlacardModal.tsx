@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG, QRCodeCanvas } from "qrcode.react";
 import { Room, api } from "@/lib/api";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface RoomQRPlacardModalProps {
   room: {
@@ -39,7 +40,7 @@ export function RoomQRPlacardModal({
 }: RoomQRPlacardModalProps) {
   const [copied, setCopied] = useState(false);
   const [lanIP, setLanIP] = useState("192.168.31.219");
-  const [hostMode, setHostMode] = useState<"current" | "lan" | "localhost" | "custom">("current");
+  const [hostMode, setHostMode] = useState<"lan" | "localhost" | "current" | "custom">("lan");
   const [customHost, setCustomHost] = useState("");
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -55,11 +56,12 @@ export function RoomQRPlacardModal({
   }, []);
 
   const getTargetURL = () => {
-    let base = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    if (hostMode === "current") {
-      base = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    } else if (hostMode === "lan") {
+    let base = `http://${lanIP}:3000`;
+    if (hostMode === "lan") {
       base = `http://${lanIP}:3000`;
+    } else if (hostMode === "current") {
+      const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      base = isLocal ? `http://${lanIP}:3000` : (typeof window !== "undefined" ? window.location.origin : `http://${lanIP}:3000`);
     } else if (hostMode === "localhost") {
       base = "http://localhost:3000";
     } else if (hostMode === "custom" && customHost.trim()) {
@@ -70,8 +72,8 @@ export function RoomQRPlacardModal({
 
   const targetURL = getTargetURL();
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(targetURL);
+  const handleCopy = async () => {
+    await copyToClipboard(targetURL);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -236,24 +238,15 @@ export function RoomQRPlacardModal({
                 <Wifi className="h-3.5 w-3.5 text-[#176B63]" />
                 <span>QR Network Target:</span>
               </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setHostMode("current")}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                    hostMode === "current"
-                      ? "bg-[#176B63] text-white shadow-xs"
-                      : "bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0]"
-                  }`}
-                >
-                  🌐 Production (Vercel)
-                </button>
+              <div className="flex items-center gap-1 flex-wrap">
                 <button
                   onClick={() => setHostMode("lan")}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
                     hostMode === "lan"
                       ? "bg-[#176B63] text-white shadow-xs"
                       : "bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0]"
                   }`}
+                  title="Direct Local Wi-Fi connection"
                 >
                   Wi-Fi ({lanIP})
                 </button>
@@ -268,14 +261,14 @@ export function RoomQRPlacardModal({
                   Localhost
                 </button>
                 <button
-                  onClick={() => setHostMode("custom")}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                    hostMode === "custom"
+                  onClick={() => setHostMode("current")}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    hostMode === "current"
                       ? "bg-[#176B63] text-white shadow-xs"
                       : "bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0]"
                   }`}
                 >
-                  Custom
+                  🌐 Production
                 </button>
               </div>
             </div>

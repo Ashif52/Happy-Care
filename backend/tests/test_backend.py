@@ -108,6 +108,28 @@ def test_staff_ticket_workflow():
     t_list_resp = client.get("/api/tickets", headers=headers)
     assert t_list_resp.status_code == 200
     tickets = t_list_resp.json()
+    if len(tickets) == 0:
+        import uuid
+        db = next(get_db())
+        u = db.query(User).filter(User.email == "technician.rajesh@careops.hospital").first()
+        tkt_obj = db.query(Ticket).filter(Ticket.assigned_staff_id == (u.id if u else 0)).first()
+        if not tkt_obj:
+            tkt_obj = Ticket(
+                ticket_number=f"TKT-MNT-{uuid.uuid4().hex[:6].upper()}",
+                category="Air Conditioner",
+                title="Room 204 AC Compressor Inspection",
+                description="AC not cooling properly.",
+                room_number="204",
+                department_id="maintenance",
+                assigned_staff_id=u.id if u else None,
+                priority="medium",
+                status="submitted"
+            )
+            db.add(tkt_obj)
+            db.commit()
+            db.refresh(tkt_obj)
+        t_list_resp = client.get("/api/tickets", headers=headers)
+        tickets = t_list_resp.json()
     assert len(tickets) > 0
 
     tkt = tickets[0]
@@ -125,7 +147,33 @@ def test_ai_verification_rules():
     db = next(get_db())
     
     fan_ticket = db.query(Ticket).filter(Ticket.category == "Ceiling Fan").first()
-    assert fan_ticket is not None
+    if not fan_ticket:
+        fan_ticket = Ticket(
+            ticket_number="TKT-TEST-FAN-01",
+            category="Ceiling Fan",
+            title="Ceiling Fan Not Rotating",
+            description="Ceiling fan stopped spinning and makes buzzing noise.",
+            room_number="204",
+            department_id="maintenance",
+            priority="high",
+            status="in_progress"
+        )
+        db.add(fan_ticket)
+        db.commit()
+        db.refresh(fan_ticket)
+    
+    before_ev = db.query(Evidence).filter(Evidence.ticket_id == fan_ticket.id, Evidence.stage == "before").first()
+    if not before_ev:
+        before_ev = Evidence(
+            ticket_id=fan_ticket.id,
+            stage="before",
+            media_type="image",
+            file_url="/uploads/baseline_fault_fan.jpg",
+            equipment_type="Ceiling Fan"
+        )
+        db.add(before_ev)
+        db.commit()
+        db.refresh(before_ev)
     
     # 1. Test Static Photo for Fan: AI must recognize still photo cannot prove rotation!
     static_after = Evidence(
@@ -135,7 +183,6 @@ def test_ai_verification_rules():
         file_url="/uploads/fake_still_fan.jpg",
         equipment_type="Ceiling Fan"
     )
-    before_ev = db.query(Evidence).filter(Evidence.ticket_id == fan_ticket.id, Evidence.stage == "before").first()
     
     result = AIVisionService.analyze_ticket_evidence(fan_ticket, before_ev, static_after)
     assert result["after_repair_functional_evidence"] == "static_unverified"

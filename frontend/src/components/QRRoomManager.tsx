@@ -21,6 +21,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { Room, User, api } from "@/lib/api";
 import { RoomQRPlacardModal } from "@/components/RoomQRPlacardModal";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface QRRoomManagerProps {
   rooms: Room[];
@@ -86,9 +87,9 @@ export function QRRoomManager({
     setRoomNum("");
   };
 
-  const handleCopy = (token: string) => {
+  const handleCopy = async (token: string) => {
     const url = getRoomUrl(token);
-    navigator.clipboard.writeText(url);
+    await copyToClipboard(url);
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 2000);
   };

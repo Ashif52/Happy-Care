@@ -580,8 +580,8 @@ export default function CareOpsApp() {
 
       {/* Main Content Pane */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 ${
-          sidebarCollapsed ? "ml-16" : "ml-64"
+        className={`flex-1 flex flex-col transition-all duration-300 ml-0 ${
+          sidebarCollapsed ? "md:ml-16" : "md:ml-64"
         }`}
       >
         <Header
@@ -596,6 +596,7 @@ export default function CareOpsApp() {
           onLogout={handleLogout}
           onSelectTicket={(id) => setSelectedTicketId(id)}
           onNavigateTab={(tab) => setCurrentTab(tab)}
+          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
         {/* Real-Time Incoming Patient Complaint Toast Banner */}
@@ -714,6 +715,7 @@ export default function CareOpsApp() {
               currentUser={currentUser}
               onReviewSubmit={handleReviewSubmit}
               onSelectTicket={(id) => setSelectedTicketId(id)}
+              onRefreshQueue={loadAllData}
             />
           )}
 

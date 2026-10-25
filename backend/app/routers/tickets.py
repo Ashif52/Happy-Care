@@ -23,7 +23,7 @@ from app.schemas import (
     TicketStartWorkRequest, TicketResolutionSubmitRequest,
     TicketClosureRequest, TicketDelayReportRequest, TicketNoteCreate,
     TicketNoteResponse, TicketContactUpdateRequest, FollowupEmailRequest,
-    TicketAssignRequest
+    TicketAssignRequest, TicketTransferDepartmentRequest
 )
 from app.services.auth_service import get_current_user
 from app.services.ticket_service import TicketService
@@ -382,6 +382,102 @@ async def assign_ticket(
         pass
 
     return enrich_ticket_response(updated, db)
+
+@router.post("/{ticket_id}/transfer-department", response_model=TicketResponse)
+async def transfer_ticket_department(
+    ticket_id: int,
+    payload: TicketTransferDepartmentRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Supervisor or Admin transfers a ticket to another department.
+    Used when a client/patient accidentally selected the wrong department or reported another problem.
+    """
+    if current_user.role not in ["supervisor", "admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Only supervisors and administrators can transfer tickets across departments.")
+
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    new_dept = db.query(Department).filter(Department.id == payload.new_department_id).first()
+    if not new_dept:
+        raise HTTPException(status_code=400, detail="Target department does not exist")
+
+    old_dept_id = ticket.department_id
+    if old_dept_id == new_dept.id:
+        raise HTTPException(status_code=400, detail="Ticket is already assigned to this department")
+
+    old_dept = db.query(Department).filter(Department.id == old_dept_id).first()
+    old_dept_name = old_dept.name if old_dept else old_dept_id
+
+    # 1. Update ticket department & supervisor
+    ticket.department_id = new_dept.id
+    ticket.assigned_supervisor_id = new_dept.supervisor_id
+    ticket.assigned_staff_id = None
+    ticket.assigned_at = None
+    ticket.status = "submitted"
+
+    # Recalculate SLA resolution target for new department
+    try:
+        ack_dl, res_dl = SLAEngine.calculate_deadlines(db, new_dept.id, ticket.priority)
+        ticket.sla_acknowledgement_deadline = ack_dl
+        ticket.sla_resolution_deadline = res_dl
+    except Exception:
+        pass
+
+    # 2. Add audit log
+    transfer_note = payload.reason.strip() if payload.reason else "Client reported issue under wrong department by error; re-routed."
+    audit = AuditLog(
+        ticket_id=ticket.id,
+        user_id=current_user.id,
+        action="TICKET_DEPARTMENT_TRANSFERRED",
+        details=json.dumps({
+            "from_department": old_dept_id,
+            "to_department": new_dept.id,
+            "transferred_by": current_user.name,
+            "reason": transfer_note
+        })
+    )
+    db.add(audit)
+
+    # 3. Add TicketNote
+    note = TicketNote(
+        ticket_id=ticket.id,
+        user_id=current_user.id,
+        author_name=current_user.name,
+        author_role=current_user.role,
+        note_type="system",
+        content=f"🔄 Department Re-routed: Transferred from {old_dept_name} to {new_dept.name}. Reason: {transfer_note}"
+    )
+    db.add(note)
+
+    db.commit()
+    db.refresh(ticket)
+
+    # 4. In-App Notifications: Alert new department supervisor
+    try:
+        from app.services.in_app_notification_service import InAppNotificationService
+        InAppNotificationService.notify_department_supervisors(
+            db=db,
+            department_id=new_dept.id,
+            event_type="TICKET_TRANSFERRED",
+            title=f"Re-routed Ticket: {ticket.ticket_number}",
+            message=f"Ticket re-routed to {new_dept.name} from {old_dept_name}. Reason: {transfer_note}",
+            ticket=ticket,
+            dedup_prefix=f"TRANSFERRED:{ticket.id}:{new_dept.id}"
+        )
+    except Exception:
+        pass
+
+    # 5. Real-time event dispatch
+    try:
+        await realtime_hub.publish_ticket_updated(serialize_ticket_for_event(ticket, db))
+    except Exception:
+        pass
+
+    return enrich_ticket_response(ticket, db)
 
 @router.post("", response_model=TicketResponse)
 async def create_staff_ticket(

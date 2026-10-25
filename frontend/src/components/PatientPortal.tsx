@@ -45,7 +45,12 @@ import {
   Video,
   Film,
   Image,
-  Plus
+  Plus,
+  Zap,
+  Bed,
+  Check,
+  Copy,
+  ChevronRight
 } from "lucide-react";
 import { api, formatTime } from "@/lib/api";
 import { RoomQRPlacardModal } from "@/components/RoomQRPlacardModal";
@@ -370,6 +375,93 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
       "Discharge billing estimate",
       "Receipt copy",
     ],
+  };
+
+  const getDeptVisuals = (deptId: string) => {
+    const d = (deptId || "").toLowerCase();
+    if (d.includes("maint") || d.includes("electr") || d.includes("engineer")) {
+      return {
+        icon: Wrench,
+        iconBg: "bg-teal-600 text-white",
+        accent: "AC, Lights, Plumbing, TV",
+      };
+    }
+    if (d.includes("nurs") || d.includes("medic") || d.includes("clinic")) {
+      return {
+        icon: HeartPulse,
+        iconBg: "bg-rose-500 text-white",
+        accent: "IV Care, Vitals, Nurse Call",
+      };
+    }
+    if (d.includes("house") || d.includes("clean") || d.includes("hygiene") || d.includes("sanit")) {
+      return {
+        icon: Sparkles,
+        iconBg: "bg-amber-500 text-white",
+        accent: "Room Sanitization, Spills",
+      };
+    }
+    if (d.includes("food") || d.includes("diet") || d.includes("meal")) {
+      return {
+        icon: Utensils,
+        iconBg: "bg-orange-500 text-white",
+        accent: "Meals, Water, Special Diet",
+      };
+    }
+    if (d.includes("bill") || d.includes("account") || d.includes("recep")) {
+      return {
+        icon: Receipt,
+        iconBg: "bg-blue-600 text-white",
+        accent: "Insurance, Claims, Receipts",
+      };
+    }
+    if (d.includes("linen") || d.includes("bed")) {
+      return {
+        icon: Sparkles,
+        iconBg: "bg-indigo-600 text-white",
+        accent: "Fresh Sheets & Blankets",
+      };
+    }
+    if (d.includes("it") || d.includes("tech") || d.includes("wifi")) {
+      return {
+        icon: Fan,
+        iconBg: "bg-cyan-600 text-white",
+        accent: "Wi-Fi, TV, Connectivity",
+      };
+    }
+    return {
+      icon: Building,
+      iconBg: "bg-slate-700 text-white",
+      accent: "Hospital Patient Care",
+    };
+  };
+
+  const getCategoryVisuals = (catName: string) => {
+    const c = (catName || "").toLowerCase();
+    if (c.includes("electr") || c.includes("light") || c.includes("power") || c.includes("switch")) {
+      return { icon: Zap, color: "from-amber-500 to-orange-500", sla: "⚡ ~12m" };
+    }
+    if (c.includes("plumb") || c.includes("water") || c.includes("leak") || c.includes("tap") || c.includes("sink") || c.includes("restroom")) {
+      return { icon: Droplets, color: "from-blue-500 to-cyan-500", sla: "⚡ ~15m" };
+    }
+    if (c.includes("air") || c.includes("ac") || c.includes("fan") || c.includes("temp") || c.includes("heat") || c.includes("climate")) {
+      return { icon: Fan, color: "from-teal-600 to-emerald-500", sla: "⚡ ~10m" };
+    }
+    if (c.includes("nurse") || c.includes("medic") || c.includes("vital") || c.includes("drip") || c.includes("iv")) {
+      return { icon: HeartPulse, color: "from-rose-500 to-red-600", sla: "⚡ ~5m Urgent" };
+    }
+    if (c.includes("linen") || c.includes("bed") || c.includes("sheet") || c.includes("pillow") || c.includes("towel") || c.includes("gown")) {
+      return { icon: Bed, color: "from-indigo-500 to-purple-600", sla: "⚡ ~10m" };
+    }
+    if (c.includes("clean") || c.includes("sanit") || c.includes("trash") || c.includes("waste") || c.includes("spill") || c.includes("mop")) {
+      return { icon: Sparkles, color: "from-emerald-500 to-teal-600", sla: "⚡ ~8m" };
+    }
+    if (c.includes("food") || c.includes("meal") || c.includes("drink") || c.includes("diet")) {
+      return { icon: Utensils, color: "from-orange-500 to-amber-600", sla: "⚡ ~15m" };
+    }
+    if (c.includes("wifi") || c.includes("tv") || c.includes("remote") || c.includes("tech") || c.includes("phone")) {
+      return { icon: Wrench, color: "from-sky-500 to-blue-600", sla: "⚡ ~10m" };
+    }
+    return { icon: Wrench, color: "from-teal-600 to-slate-700", sla: "⚡ ~12m" };
   };
 
   const availableDepartments = useMemo(() => {
@@ -764,24 +856,25 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
 
 
   return (
-    <div className="min-h-full bg-[#F7F8FA] flex flex-col justify-between max-w-xl mx-auto shadow-2xl relative">
+    <div className="w-full flex-1 bg-slate-50 flex flex-col justify-between relative">
       {/* Top Header Bar */}
-      <header className="bg-white border-b border-[#E2E8F0] px-5 py-3.5 flex items-center justify-between sticky top-0 z-20 shadow-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-[#176B63] flex items-center justify-center text-white shadow-xs">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-[#12685E] to-[#1DAA9B] flex items-center justify-center text-white shadow-xs">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-xs font-bold text-[#0F172A] flex items-center gap-1.5">
-              <span>Happy Care Bedside Assist</span>
-              <span className="text-[10px] text-[#16805D] bg-[#EDF7F2] px-1.5 py-0.5 rounded-full font-bold">
-                Live Portal
+            <div className="text-xs font-black text-slate-900 flex items-center gap-2 leading-tight">
+              <span>HappyCare Bedside</span>
+              <span className="text-[10px] text-teal-800 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live Inpatient Care
               </span>
             </div>
-            <div className="text-[11px] text-[#64748B] flex items-center gap-1">
-              <Building className="h-3 w-3" />
+            <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
+              <Building className="h-3 w-3 text-teal-600 shrink-0" />
               <span>
-                {roomData ? `${roomData.room_number} • ${roomData.wing}` : "Resolving Location..."}
+                {roomData ? `${roomData.room_number} • ${roomData.wing}` : "Bedside Assistant"}
               </span>
             </div>
           </div>
@@ -789,17 +882,26 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setShowQRModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#176B63] hover:bg-[#10574F] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-            title="View Real Scannable Room QR Code"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 text-xs font-bold transition-all cursor-pointer"
+            title="View Real Scannable Room QR Placard"
           >
-            <QrCode className="h-4 w-4" />
-            <span className="hidden sm:inline">Room QR</span>
+            <QrCode className="h-3.5 w-3.5 text-teal-700" />
+            <span className="hidden sm:inline">QR Placard</span>
           </button>
+          <a
+            href="/"
+            className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100/80 text-[#176B63] border border-teal-200/80 text-xs font-bold transition-all flex items-center gap-1"
+            title="Switch to Staff & Administration Portal"
+          >
+            <span>Staff Portal</span>
+          </a>
           {onClose && (
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] cursor-pointer"
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               title="Close patient portal"
             >
               <X className="h-5 w-5" />
@@ -1087,123 +1189,204 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
             {/* VIEW 3: LODGE SERVICE REQUEST FLOW (Original Flow) */}
             {patientView === "lodge" && (
               <>
-                {/* STEP 1: DEPARTMENT & CATEGORY SELECTION */}
+                {/* STEP 1: LUXURY BEDSIDE HOSPITAL CONCIERGE & CATEGORY SELECTION */}
                 {step === "categories" && (
                   <div className="space-y-4 animate-in fade-in duration-200">
-                    {/* Verified Room Location Card */}
-                    <div className="p-4 rounded-2xl bg-[#E8F3F1] border-2 border-[#A7D7D1] space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-[#176B63] uppercase tracking-wider">
-                          Verified Room Location
-                        </span>
-                        <span className="text-[10px] font-mono text-[#176B63] bg-white px-2 py-0.5 rounded-md border border-[#A7D7D1]">
-                          {roomData?.token || currentToken}
-                        </span>
+                    {/* Top Row: Responsive Luxury Room Card */}
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#064E3B] via-[#0D5E56] to-[#0F766E] p-5 sm:p-6 text-white shadow-xl shadow-teal-950/15 flex flex-col justify-between">
+                      <div className="absolute -top-16 -right-16 h-44 w-44 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                      <div className="absolute -bottom-12 -left-12 h-36 w-36 rounded-full bg-teal-300/20 blur-xl pointer-events-none" />
+
+                      <div className="relative z-10 space-y-3.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-[11px] font-extrabold tracking-wide text-teal-100 border border-white/20 shadow-xs">
+                            <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
+                            Verified Bedside Suite
+                          </span>
+                          <span className="font-mono text-[11px] font-bold text-teal-100/90 bg-black/30 px-2.5 py-1 rounded-xl border border-white/15">
+                            {roomData?.token || currentToken}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                            {roomData ? roomData.room_number : "Suite 501"}
+                            <span className="text-teal-200 font-semibold text-sm sm:text-base ml-2">
+                              • {roomData?.wing || "VIP Pavilion"}
+                            </span>
+                          </h2>
+                          <p className="text-xs text-teal-100/80 font-medium mt-0.5">
+                            {roomData?.floor || "Floor 5"} • Metropolitan General Hospital
+                          </p>
+                        </div>
+
+                        {/* Floor Station Online Row */}
+                        <div className="pt-3 border-t border-white/15 flex items-center justify-between text-[11px] text-teal-100/90 font-semibold">
+                          <div className="flex items-center gap-1.5 text-emerald-300">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>Floor Station Online</span>
+                          </div>
+                        </div>
                       </div>
-                      <h2 className="text-base font-black text-[#0F172A]">
-                        {roomData ? `${roomData.room_number} • ${roomData.wing}` : "Room 204 • East Wing"}
-                      </h2>
-                      <p className="text-[11px] text-[#475569]">
-                        {roomData?.floor || "Floor 2"} • Metropolitan General Hospital
-                      </p>
                     </div>
 
-                    <div className="pb-1 border-b border-[#E2E8F0]">
-                      <h2 className="text-base font-black text-[#0F172A]">
-                        Select Department & Service Request
-                      </h2>
-                      <p className="text-xs text-[#64748B]">
-                        Requests are routed directly and exclusively to the selected department's supervisors.
-                      </p>
+                    {/* Department Showcase Grid */}
+                    <div className="space-y-2.5 pt-2">
+                      <div className="flex items-center justify-between px-0.5">
+                        <div>
+                          <h3 className="text-sm font-black text-slate-900 tracking-tight">Select Service Department</h3>
+                          <p className="text-[11px] text-slate-500 font-medium">Requests are routed directly to on-duty departmental supervisors</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                        {availableDepartments.map((dept: any) => {
+                          const isSelected = activeDeptId === dept.id;
+                          const visual = getDeptVisuals(dept.id);
+                          const DeptIcon = visual.icon;
+                          return (
+                            <button
+                              key={dept.id}
+                              type="button"
+                              onClick={() => setActiveDeptId(dept.id)}
+                              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group flex flex-col justify-between min-h-[104px] ${
+                                isSelected
+                                  ? "bg-gradient-to-br from-white via-teal-50/80 to-emerald-50/50 border-teal-600 shadow-md shadow-teal-900/10 ring-2 ring-teal-600/30 scale-[1.02]"
+                                  : "bg-white border-slate-200/90 hover:border-slate-300 hover:shadow-xs active:scale-[0.98]"
+                              }`}
+                            >
+                              {isSelected && (
+                                <span className="absolute top-2.5 right-2.5 flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-600"></span>
+                                </span>
+                              )}
+                              <div className="flex items-center justify-between">
+                                <div className={`h-9 w-9 rounded-xl flex items-center justify-center shadow-2xs ${visual.iconBg}`}>
+                                  <DeptIcon className="h-5 w-5" />
+                                </div>
+                                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100/90 px-1.5 py-0.5 rounded-md border border-slate-200/60">
+                                  {dept.code}
+                                </span>
+                              </div>
+                              <div className="mt-2.5">
+                                <div className={`text-xs font-black tracking-tight leading-tight ${isSelected ? "text-teal-950" : "text-slate-900 group-hover:text-teal-700"}`}>
+                                  {dept.name}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
+                                  {visual.accent}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
-                    {/* Department Select Tabs */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-                      {availableDepartments.map((dept: any) => (
-                        <button
-                          key={dept.id}
-                          type="button"
-                          onClick={() => setActiveDeptId(dept.id)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                            activeDeptId === dept.id
-                              ? "bg-[#176B63] text-white shadow-xs"
-                              : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                          }`}
-                        >
-                          {dept.name}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Active Department Details & Permitted Categories */}
+                    {/* Active Department Categories */}
                     {(() => {
                       const currentDept =
                         availableDepartments.find((d: any) => d.id === activeDeptId) ||
                         availableDepartments[0];
                       if (!currentDept) return null;
                       return (
-                        <div className="space-y-3">
-                          <div className="p-3 bg-white rounded-2xl border border-slate-200">
-                            <div className="flex items-center justify-between">
-                              <h3 className="text-sm font-black text-[#0F172A]">
-                                {currentDept.name} Department
-                              </h3>
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#EDF7F2] text-[#16805D]">
-                                {currentDept.code}
+                        <div className="space-y-3 pt-3 border-t border-slate-200/80">
+                          <div className="flex items-center justify-between px-0.5">
+                            <div>
+                              <span className="text-xs font-black text-slate-900">
+                                Common {currentDept.name} Issues
+                              </span>
+                              <span className="text-[11px] text-slate-400 font-medium ml-2">
+                                ({currentDept.categories.length} issue types)
                               </span>
                             </div>
-                            <p className="text-xs text-[#64748B] mt-0.5">{currentDept.description}</p>
+                            <span className="text-[10px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200/60">
+                              Tap to describe &amp; dispatch
+                            </span>
                           </div>
 
-                          <div className="space-y-2">
-                            <span className="text-xs font-bold text-slate-700 block">
-                              Select Issue Category:
-                            </span>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                              {currentDept.categories.map((cat: string, idx: number) => (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {currentDept.categories.map((cat: string, idx: number) => {
+                              const catVisual = getCategoryVisuals(cat);
+                              const CatIcon = catVisual.icon;
+                              return (
                                 <button
                                   key={idx}
                                   type="button"
                                   onClick={() => handleSelectCategory(currentDept.id, cat)}
-                                  className="text-left p-3.5 rounded-2xl bg-white border-2 border-slate-200 hover:border-[#176B63] hover:shadow-xs transition flex items-center justify-between group cursor-pointer"
+                                  className="text-left p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200/90 hover:border-teal-600 hover:shadow-lg hover:shadow-teal-900/5 hover:-translate-y-0.5 active:scale-[0.98] transition-all flex items-center justify-between group cursor-pointer relative overflow-hidden"
                                 >
-                                  <div>
-                                    <h4 className="text-xs font-bold text-[#0F172A] group-hover:text-[#176B63] transition-colors">
-                                      {cat}
-                                    </h4>
-                                    <span className="text-[10px] text-slate-400">
-                                      {currentDept.name} Service
-                                    </span>
+                                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                                    <div className={`h-10 w-10 rounded-xl bg-gradient-to-tr ${catVisual.color} text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform`}>
+                                      <CatIcon className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-teal-950 transition-colors leading-snug">
+                                        {cat}
+                                      </h4>
+                                      <div className="flex items-center gap-1.5 mt-1">
+                                        <span className="text-[10px] font-semibold text-slate-400">
+                                          {currentDept.name}
+                                        </span>
+                                        <span className="text-[9px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.2 rounded-full border border-teal-200/60">
+                                          {catVisual.sla}
+                                        </span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-[#176B63] group-hover:translate-x-0.5 transition" />
+                                  <div className="h-7 w-7 rounded-xl bg-slate-50 group-hover:bg-teal-600 group-hover:text-white text-slate-400 flex items-center justify-center shrink-0 transition-all shadow-2xs">
+                                    <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                                  </div>
                                 </button>
-                              ))}
-                            </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
                     })()}
+
+                    {/* Service Guarantee Banner */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-50/80 via-emerald-50/50 to-slate-50 border border-teal-200/70 flex flex-col sm:flex-row items-center justify-between gap-2 mt-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <ShieldCheck className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-teal-950">HappyCare Verified Service Guarantee</div>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            Live SLA tracking • Computer Vision verification • Automated supervisor escalation
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-teal-800 bg-teal-100/80 px-2.5 py-1 rounded-lg shrink-0">
+                        100% Zero App Required
+                      </span>
+                    </div>
                   </div>
                 )}
 
-            {/* STEP 3: COMPLAINT FORM */}
+            {/* STEP 2: COMPLAINT FORM */}
             {step === "form" && (
               <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
                   <button
                     type="button"
                     onClick={() => setStep("categories")}
-                    className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#0F172A] font-bold cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-xs text-slate-700 font-bold cursor-pointer transition-colors"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     <span>Back to Categories</span>
                   </button>
-                  <span className="text-xs font-bold text-[#176B63]">{categoryName}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200/80 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      {categoryName}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Complaint Title */}
                 <div>
-                  <label className="text-xs font-bold text-[#0F172A] block mb-1">
+                  <label className="text-xs font-black text-slate-900 block mb-1.5">
                     Complaint Title / Issue Summary *
                   </label>
                   <input
@@ -1212,14 +1395,14 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                     placeholder="e.g. Ceiling light over bed 2 is not turning on"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full p-3 rounded-2xl border-2 border-[#CBD5E1] bg-white text-xs font-medium focus:outline-none focus:border-[#176B63]"
+                    className="w-full p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 focus:bg-white text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10 transition-all"
                   />
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label className="text-xs font-bold text-[#0F172A] block mb-1">
-                    Details & Specific Room Area *
+                  <label className="text-xs font-black text-slate-900 block mb-1.5">
+                    Details &amp; Specific Room Area *
                   </label>
                   <textarea
                     required
@@ -1227,25 +1410,25 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                     placeholder="Describe the problem, location in room, or any noise/leaks..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full p-3 rounded-2xl border-2 border-[#CBD5E1] bg-white text-xs font-medium focus:outline-none focus:border-[#176B63]"
+                    className="w-full p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 focus:bg-white text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10 transition-all"
                   />
                 </div>
 
                 {/* Voice Note Recording Option */}
-                <div className="p-3.5 rounded-2xl bg-white border-2 border-[#CBD5E1] space-y-3">
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#0F172A] flex items-center gap-1.5">
-                      <Mic className="h-4 w-4 text-[#176B63]" />
+                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                      <Mic className="h-4 w-4 text-teal-600" />
                       <span>Optional Voice Note</span>
                     </span>
                     {audioUrl && (
                       <button
                         type="button"
                         onClick={resetRecording}
-                        className="text-[11px] text-[#DC2626] font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        className="text-[11px] text-rose-600 font-bold hover:underline cursor-pointer flex items-center gap-1"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        <span>Delete</span>
+                        <span>Delete Recording</span>
                       </button>
                     )}
                   </div>
@@ -1257,37 +1440,37 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                           <button
                             type="button"
                             onClick={startRecording}
-                            className="px-4 py-2.5 rounded-xl bg-[#176B63] hover:bg-[#10574F] text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs shrink-0"
+                            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-600 hover:from-teal-800 hover:to-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs shrink-0 active:scale-95"
                           >
                             <Mic className="h-4 w-4" />
                             <span>Record Voice Message</span>
                           </button>
-                          <span className="text-[11px] text-[#64748B]">
-                            Speak details in your language (hands-free)
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            Speak details in your language (hands-free audio dispatch)
                           </span>
                         </div>
                       ) : (
-                        <div className="p-3 bg-[#FEF2F2] rounded-xl border border-[#FCA5A5] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="p-3.5 bg-rose-50/80 rounded-2xl border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5">
                             <span className="relative flex h-3 w-3">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600"></span>
                             </span>
                             <div className="flex items-center gap-1">
-                              <span className="w-1 h-3 bg-[#DC2626] rounded-full animate-pulse" />
-                              <span className="w-1 h-5 bg-[#DC2626] rounded-full animate-pulse delay-75" />
-                              <span className="w-1 h-2 bg-[#DC2626] rounded-full animate-pulse delay-150" />
+                              <span className="w-1 h-3 bg-rose-600 rounded-full animate-pulse" />
+                              <span className="w-1 h-5 bg-rose-600 rounded-full animate-pulse delay-75" />
+                              <span className="w-1 h-2 bg-rose-600 rounded-full animate-pulse delay-150" />
                             </div>
-                            <span className="text-xs font-mono font-bold text-[#DC2626]">
+                            <span className="text-xs font-mono font-bold text-rose-700">
                               Recording: {formatAudioDuration(recordingSeconds)}
                             </span>
-                            <span className="text-[11px] text-[#991B1B]">(Max 2:00)</span>
+                            <span className="text-[11px] text-rose-500">(Max 2:00)</span>
                           </div>
 
                           <button
                             type="button"
                             onClick={stopRecording}
-                            className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm shrink-0"
+                            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm shrink-0"
                           >
                             <Square className="h-3.5 w-3.5 fill-current" />
                             <span>Stop Recording</span>
@@ -1296,7 +1479,7 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                       )}
                     </div>
                   ) : (
-                    <div className="p-3 bg-[#F0FDF4] rounded-xl border border-[#BBF7D0] space-y-2.5">
+                    <div className="p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-200 space-y-2.5">
                       <audio
                         ref={audioPlayerRef}
                         src={audioUrl}
@@ -1310,7 +1493,7 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                         <button
                           type="button"
                           onClick={togglePlayback}
-                          className="h-9 w-9 rounded-xl bg-[#176B63] hover:bg-[#10574F] text-white flex items-center justify-center shrink-0 shadow-sm cursor-pointer transition-transform active:scale-95"
+                          className="h-9 w-9 rounded-xl bg-teal-700 hover:bg-teal-800 text-white flex items-center justify-center shrink-0 shadow-sm cursor-pointer transition-transform active:scale-95"
                           title={isPlaying ? "Pause" : "Play"}
                         >
                           {isPlaying ? (
@@ -1321,11 +1504,11 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between text-[11px] font-mono font-bold text-[#17212F] mb-1">
-                            <span className="text-[#176B63]">
+                          <div className="flex items-center justify-between text-[11px] font-mono font-bold text-slate-800 mb-1">
+                            <span className="text-teal-700">
                               {formatAudioDuration(playbackTime)}
                             </span>
-                            <span className="text-[#64748B]">
+                            <span className="text-slate-500">
                               {formatAudioDuration(recordedDuration)}
                             </span>
                           </div>
@@ -1335,12 +1518,12 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                             max={recordedDuration || 1}
                             value={playbackTime}
                             onChange={(e) => handleSeek(Number(e.target.value))}
-                            className="w-full h-1.5 bg-[#CBD5E1] rounded-lg appearance-none cursor-pointer accent-[#176B63]"
+                            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
                           />
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[11px] font-bold text-[#16805D] bg-[#DCFCE7] px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg flex items-center gap-1">
                             <span>Recorded ✓</span>
                           </span>
                         </div>
@@ -1350,21 +1533,21 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                 </div>
 
                 {/* Photo & Video Attachments */}
-                <div className="p-3.5 rounded-2xl bg-white border-2 border-[#CBD5E1] space-y-3">
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-xs font-bold text-[#0F172A]">Photo &amp; Video Attachments</span>
-                      <p className="text-[11px] text-[#64748B]">Optional media evidence (up to 3 files, max 25MB each)</p>
+                      <span className="text-xs font-black text-slate-900">Photo &amp; Video Evidence</span>
+                      <p className="text-[11px] text-slate-500 font-medium">Add visual proof for AI Computer Vision verification (up to 3 files)</p>
                     </div>
                     {attachments.length > 0 && (
-                      <span className="text-[11px] font-bold text-[#176B63] bg-[#E8F3F1] px-2 py-0.5 rounded-full">
+                      <span className="text-[11px] font-bold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200/60">
                         {attachments.length}/3 attached
                       </span>
                     )}
                   </div>
 
                   {attachmentError && (
-                    <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-1.5">
+                    <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-1.5">
                       <AlertTriangle className="h-4 w-4 shrink-0" />
                       <span>{attachmentError}</span>
                     </div>
@@ -1376,9 +1559,9 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                       {attachments.map((att) => (
                         <div
                           key={att.id}
-                          className="flex items-center gap-2 p-2 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] relative group"
+                          className="flex items-center gap-2.5 p-2 rounded-xl border border-slate-200/90 bg-slate-50/80 relative group"
                         >
-                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-black/5 shrink-0 flex items-center justify-center border border-[#E2E8F0]">
+                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-black/5 shrink-0 flex items-center justify-center border border-slate-200">
                             {att.mediaType === "PHOTO" ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={att.previewUrl} alt={att.fileName} className="w-full h-full object-cover" />
@@ -1389,7 +1572,7 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                             )}
                           </div>
                           <div className="flex-1 min-w-0 pr-6">
-                            <p className="text-xs font-semibold text-[#0F172A] truncate" title={att.fileName}>
+                            <p className="text-xs font-semibold text-slate-900 truncate" title={att.fileName}>
                               {att.fileName}
                             </p>
                             <div className="flex items-center gap-1.5 mt-0.5">
@@ -1402,13 +1585,13 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                               >
                                 {att.mediaType}
                               </span>
-                              <span className="text-[11px] text-[#64748B]">{formatFileSize(att.fileSizeBytes)}</span>
+                              <span className="text-[11px] text-slate-500">{formatFileSize(att.fileSizeBytes)}</span>
                             </div>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleRemoveAttachment(att.id)}
-                            className="absolute right-2 top-2 p-1 text-[#94A3B8] hover:text-red-600 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+                            className="absolute right-2 top-2 p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Remove attachment"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1423,10 +1606,10 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                     <button
                       type="button"
                       onClick={() => setShowAttachmentChooser(true)}
-                      className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-[#CBD5E1] hover:border-[#176B63] bg-[#F8FAFC] hover:bg-white text-xs font-semibold text-[#176B63] transition-all cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl border-2 border-dashed border-slate-300 hover:border-teal-600 bg-slate-50/60 hover:bg-teal-50/30 text-xs font-bold text-teal-800 transition-all cursor-pointer"
                     >
                       <Plus className="h-4 w-4" />
-                      <span>Add Photo or Video</span>
+                      <span>Attach Photo or Video Evidence</span>
                     </button>
                   )}
 
@@ -1464,15 +1647,17 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                 </div>
 
                 {/* Patient Contact Information: Mobile Phone & Email Address */}
-                <div className="space-y-4">
+                <div className="space-y-3.5">
                   {/* Mobile Phone Number (Required for WhatsApp & Live Tracking) */}
                   <div>
-                    <label className="text-xs font-bold text-[#0F172A] flex items-center justify-between mb-1">
+                    <label className="text-xs font-black text-slate-900 flex items-center justify-between mb-1.5">
                       <span className="flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5 text-[#176B63]" />
+                        <Phone className="h-3.5 w-3.5 text-teal-600" />
                         <span>Mobile Phone Number *</span>
                       </span>
-                      <span className="text-[10px] text-[#16805D] font-bold">WhatsApp Enabled</span>
+                      <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        WhatsApp Live Updates
+                      </span>
                     </label>
                     <div className="relative">
                       <input
@@ -1481,23 +1666,23 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                         placeholder="e.g. +1 555-0192 or +91 98450 11223"
                         value={patientContact}
                         onChange={(e) => setPatientContact(e.target.value)}
-                        className="w-full p-3 rounded-2xl border-2 border-[#CBD5E1] bg-white text-xs font-medium focus:outline-none focus:border-[#176B63] pl-9"
+                        className="w-full p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 focus:bg-white text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10 pl-10 transition-all"
                       />
-                      <Phone className="h-4 w-4 text-[#64748B] absolute left-3 top-3.5" />
+                      <Phone className="h-4 w-4 text-slate-400 absolute left-3.5 top-4" />
                     </div>
-                    <p className="text-[11px] text-[#64748B] mt-1">
-                      Mandatory for live WhatsApp resolution updates and tracking link delivery.
+                    <p className="text-[11px] text-slate-500 font-medium mt-1">
+                      Mandatory for automated WhatsApp status dispatch and tracking receipts.
                     </p>
                   </div>
 
                   {/* Patient Email Address (Mandatory for Work Started & Finished Receipts) */}
                   <div>
-                    <label className="text-xs font-bold text-[#0F172A] flex items-center justify-between mb-1">
+                    <label className="text-xs font-black text-slate-900 flex items-center justify-between mb-1.5">
                       <span className="flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5 text-[#176B63]" />
+                        <Mail className="h-3.5 w-3.5 text-teal-600" />
                         <span>Client Email Address *</span>
                       </span>
-                      <span className="text-[10px] text-[#16805D] font-bold bg-[#EDF7F2] px-2 py-0.5 rounded-full border border-[#A6E1CE]">
+                      <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                         Required for Receipts
                       </span>
                     </label>
@@ -1505,15 +1690,15 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                       <input
                         type="email"
                         required
-                        placeholder="e.g. client@gmail.com (for Work Started & Finished receipts)"
+                        placeholder="e.g. client@gmail.com"
                         value={patientEmail}
                         onChange={(e) => setPatientEmail(e.target.value)}
-                        className="w-full p-3 rounded-2xl border-2 border-[#CBD5E1] bg-white text-xs font-medium focus:outline-none focus:border-[#176B63] pl-9"
+                        className="w-full p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 focus:bg-white text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm font-medium focus:outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10 pl-10 transition-all"
                       />
-                      <Mail className="h-4 w-4 text-[#64748B] absolute left-3 top-3.5" />
+                      <Mail className="h-4 w-4 text-slate-400 absolute left-3.5 top-4" />
                     </div>
-                    <p className="text-[11px] text-[#176B63] font-semibold mt-1">
-                      Mandatory: Automated emails will be dispatched to this address when work begins and when work finishes, including your tracking receipt.
+                    <p className="text-[11px] text-teal-800 font-semibold mt-1">
+                      Automated confirmation receipts will be emailed when work begins and when verified.
                     </p>
                   </div>
                 </div>
@@ -1522,10 +1707,10 @@ export function PatientPortal({ onClose, initialRoomToken, allRooms, currentUser
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 rounded-2xl bg-[#176B63] hover:bg-[#10574F] text-white text-sm font-black shadow-lg shadow-[#176B63]/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 hover:from-teal-800 hover:to-emerald-700 text-white text-sm font-black shadow-xl shadow-teal-700/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50 active:scale-[0.99]"
                 >
                   <Send className="h-4 w-4" />
-                  <span>{isSubmitting ? "Submitting to Hospital Staff..." : "Submit Complaint Now"}</span>
+                  <span>{isSubmitting ? "Submitting to Hospital Staff..." : "Submit Bedside Request Now"}</span>
                 </button>
               </form>
             )}

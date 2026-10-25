@@ -175,11 +175,20 @@ export function Sidebar({
   }
 
   return (
-    <aside
-      className={`fixed top-0 left-0 bottom-0 z-30 flex flex-col bg-white/85 backdrop-blur-xl border-r border-slate-200/75 shadow-[0_0_24px_rgba(0,0,0,0.02)] transition-all duration-300 select-none ${
-        collapsed ? "w-16" : "w-64"
-      }`}
-    >
+    <>
+      {/* Mobile Backdrop */}
+      {!collapsed && (
+        <div
+          onClick={() => setCollapsed(true)}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-25 md:hidden animate-in fade-in duration-200"
+        />
+      )}
+
+      <aside
+        className={`fixed top-0 left-0 bottom-0 z-30 flex flex-col bg-white/95 md:bg-white/85 backdrop-blur-xl border-r border-slate-200/75 shadow-[0_0_24px_rgba(0,0,0,0.06)] md:shadow-[0_0_24px_rgba(0,0,0,0.02)] transition-all duration-300 select-none ${
+          collapsed ? "-translate-x-full md:translate-x-0 md:w-16" : "translate-x-0 w-64 shadow-2xl"
+        }`}
+      >
       {/* Sleek Apple-style Brand Header */}
       <div className="h-14 flex items-center justify-between px-3 border-b border-slate-200/70 shrink-0">
         <div className="flex items-center gap-2.5 overflow-hidden">
@@ -353,5 +362,6 @@ export function Sidebar({
         </div>
       </div>
     </aside>
+    </>
   );
 }

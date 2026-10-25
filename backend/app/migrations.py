@@ -221,7 +221,7 @@ def run_migrations():
         core_personnel = [
             {
                 "email": "admin@careops.hospital",
-                "name": "Dr. Alistair Vance",
+                "name": "Dr. Pavithra",
                 "emp_id": "EMP-ADM-0001",
                 "designation": "Chief Medical Officer & Hospital Administrator",
                 "role": "admin",
