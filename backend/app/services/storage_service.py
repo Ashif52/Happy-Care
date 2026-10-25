@@ -109,11 +109,31 @@ class StorageService:
         )
 
     @staticmethod
+    def is_cloudinary_configured() -> bool:
+        """Check if Cloudinary environment credentials are provided"""
+        return bool(
+            settings.CLOUDINARY_URL
+            or (settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY and settings.CLOUDINARY_API_SECRET)
+        )
+
+    @staticmethod
+    def _init_cloudinary():
+        """Configure Cloudinary SDK with environment credentials"""
+        import cloudinary
+        if settings.CLOUDINARY_URL:
+            cloudinary.config(cloudinary_url=settings.CLOUDINARY_URL)
+        else:
+            cloudinary.config(
+                cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                api_key=settings.CLOUDINARY_API_KEY,
+                api_secret=settings.CLOUDINARY_API_SECRET,
+                secure=True
+            )
+
+    @staticmethod
     def save_upload_file(file: UploadFile, subfolder: str = "evidence") -> Tuple[str, str, int, str]:
-        """Saves an UploadFile with magic bytes validation. Returns (relative_url, sha256_hash, file_size_bytes, media_type)"""
+        """Saves an UploadFile with magic bytes validation. Returns (url, sha256_hash, file_size_bytes, media_type)"""
         clean_subfolder = StorageService._sanitize_subfolder(subfolder)
-        target_dir = Path(settings.UPLOAD_DIR) / clean_subfolder
-        target_dir.mkdir(parents=True, exist_ok=True)
         
         file_ext = Path(file.filename).suffix.lower() if file.filename else ".bin"
         if file_ext not in ALLOWED_EXTENSIONS:
@@ -129,23 +149,45 @@ class StorageService:
             
         detected_ext, media_type = StorageService.inspect_and_validate_magic_bytes(first_chunk, fallback_ext=file_ext)
         
+        # Read full content for hash and size calculation
+        sha256 = hashlib.sha256()
+        sha256.update(first_chunk)
+        remaining = file.file.read()
+        sha256.update(remaining)
+        full_content = first_chunk + remaining
+        size = len(full_content)
+        
+        if size > MAX_MEDIA_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail=f"File size exceeds allowable maximum ({MAX_MEDIA_SIZE_BYTES // (1024*1024)}MB)")
+
+        # 1. Permanent Cloud Storage: Upload to Cloudinary if configured (e.g. Render / Cloud)
+        if StorageService.is_cloudinary_configured():
+            try:
+                StorageService._init_cloudinary()
+                import cloudinary.uploader
+                resource_type = "video" if media_type == "video" else ("image" if media_type == "image" else "auto")
+                upload_res = cloudinary.uploader.upload(
+                    full_content,
+                    folder=f"careops/{clean_subfolder}",
+                    resource_type=resource_type,
+                    unique_filename=True,
+                    overwrite=False
+                )
+                secure_url = upload_res.get("secure_url") or upload_res.get("url")
+                if secure_url:
+                    return secure_url, sha256.hexdigest(), size, media_type
+            except Exception as e:
+                import logging
+                logging.getLogger("careops.storage").error(f"Cloudinary upload failed: {e}. Falling back to local storage.", exc_info=True)
+
+        # 2. Local File Storage Fallback (Local development or if Cloudinary not set)
+        target_dir = Path(settings.UPLOAD_DIR) / clean_subfolder
+        target_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{uuid.uuid4().hex}{detected_ext}"
         file_path = target_dir / filename
         
-        sha256 = hashlib.sha256()
-        sha256.update(first_chunk)
-        size = len(first_chunk)
-        
         with open(file_path, "wb") as f:
-            f.write(first_chunk)
-            while chunk := file.file.read(8192):
-                sha256.update(chunk)
-                size += len(chunk)
-                if size > MAX_MEDIA_SIZE_BYTES:
-                    f.close()
-                    os.remove(file_path)
-                    raise HTTPException(status_code=413, detail=f"File size exceeds allowable maximum ({MAX_MEDIA_SIZE_BYTES // (1024*1024)}MB)")
-                f.write(chunk)
+            f.write(full_content)
                 
         relative_url = f"/uploads/{clean_subfolder}/{filename}"
         return relative_url, sha256.hexdigest(), size, media_type
@@ -155,11 +197,9 @@ class StorageService:
         """
         Decodes and saves base64 data URI (e.g. data:image/jpeg;base64,... or data:video/mp4;base64,...).
         Performs binary magic bytes validation.
-        Returns: (relative_url, file_hash, file_size, media_type)
+        Returns: (url, file_hash, file_size, media_type)
         """
         clean_subfolder = StorageService._sanitize_subfolder(subfolder)
-        target_dir = Path(settings.UPLOAD_DIR) / clean_subfolder
-        target_dir.mkdir(parents=True, exist_ok=True)
         
         hint_ext = default_ext
         if "," in base64_data:
@@ -194,6 +234,30 @@ class StorageService:
             
         detected_ext, media_type = StorageService.inspect_and_validate_magic_bytes(file_bytes, fallback_ext=hint_ext)
         file_hash = hashlib.sha256(file_bytes).hexdigest()
+
+        # 1. Permanent Cloud Storage: Upload to Cloudinary if configured
+        if StorageService.is_cloudinary_configured():
+            try:
+                StorageService._init_cloudinary()
+                import cloudinary.uploader
+                resource_type = "video" if media_type == "video" else ("image" if media_type == "image" else "auto")
+                upload_res = cloudinary.uploader.upload(
+                    file_bytes,
+                    folder=f"careops/{clean_subfolder}",
+                    resource_type=resource_type,
+                    unique_filename=True,
+                    overwrite=False
+                )
+                secure_url = upload_res.get("secure_url") or upload_res.get("url")
+                if secure_url:
+                    return secure_url, file_hash, size, media_type
+            except Exception as e:
+                import logging
+                logging.getLogger("careops.storage").error(f"Cloudinary base64 upload failed: {e}. Falling back to local storage.", exc_info=True)
+
+        # 2. Local File Storage Fallback
+        target_dir = Path(settings.UPLOAD_DIR) / clean_subfolder
+        target_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{uuid.uuid4().hex}{detected_ext}"
         file_path = target_dir / filename
         

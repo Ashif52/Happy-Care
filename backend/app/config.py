@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     MAINTENANCE_DEPARTMENT_MOBILE: str = os.getenv("MAINTENANCE_DEPARTMENT_MOBILE", "+91 98765 00003")
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
 
+    # Cloudinary Cloud Storage for Permanent Videos & Photos (Free Tier)
+    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "")
+    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "")
+    CLOUDINARY_URL: str = os.getenv("CLOUDINARY_URL", "")
+
     class Config:
         env_file = ".env"
         extra = "allow"
