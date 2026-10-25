@@ -162,7 +162,10 @@ export function StaffAccessManagementView({
         page_size: pageSize,
       });
 
-      setStaffList(data.items);
+      const items = (data.items || []).filter(
+        (member: StaffMember) => currentUser?.role === "superadmin" || member.role !== "superadmin"
+      );
+      setStaffList(items);
       setMetrics(data.metrics);
       setTotalItems(data.total);
       setTotalPages(data.total_pages);

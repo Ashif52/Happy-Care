@@ -11,7 +11,7 @@ export default function PatientQRClient({
   const { token } = use(paramsPromise);
 
   return (
-    <div className="min-h-screen bg-[#17212F] flex flex-col items-center justify-center p-2 sm:p-6">
+    <div className="min-h-screen min-h-[100dvh] bg-[#17212F] flex flex-col items-center p-2 sm:p-6 py-4 sm:py-8 overflow-x-hidden">
       <div className="w-full max-w-lg mb-2 flex items-center justify-between text-xs text-white/90 px-2">
         <span className="font-semibold text-white">Bedside Care Point</span>
         <a

@@ -18,7 +18,8 @@ import secrets
 from datetime import timedelta
 from app.schemas import (
     LoginRequest, RegisterRequest, TokenResponse, UserResponse,
-    ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordWithTokenRequest
+    ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordWithTokenRequest,
+    ProfileUpdateRequest
 )
 from app.services.email_service import EmailService
 
@@ -327,6 +328,79 @@ def get_me(current_user: User = Depends(get_current_user)):
         "department_id": current_user.department_id,
         "phone": current_user.phone,
         "avatar_url": None,
+        "is_active": current_user.is_active,
+        "employee_id": current_user.employee_id,
+        "patient_id": getattr(current_user, "patient_id", None),
+        "token_version": getattr(current_user, "token_version", 1),
+        "designation": current_user.designation,
+        "account_status": current_user.account_status,
+        "failed_login_attempts": current_user.failed_login_attempts,
+        "locked_at": current_user.locked_at,
+        "locked_reason": current_user.locked_reason,
+        "last_login_at": current_user.last_login_at,
+        "created_at": current_user.created_at,
+        "permissions": user_perms
+    }
+
+@router.put("/profile", response_model=UserResponse)
+@router.put("/me", response_model=UserResponse)
+def update_profile(
+    payload: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Authoritative profile update endpoint for the currently logged-in user.
+    Preserves user ID, email, role, department, employee_id, and permissions.
+    Validates updated name and updates PostgreSQL database.
+    Writes audit log and returns refreshed canonical user record.
+    """
+    old_name = current_user.name
+    if payload.name is not None:
+        clean_name = payload.name.strip()
+        if len(clean_name) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Name must be at least 2 characters long."
+            )
+        if len(clean_name) > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Name cannot exceed 100 characters."
+            )
+        current_user.name = clean_name
+
+    if payload.phone is not None:
+        current_user.phone = payload.phone.strip() if payload.phone else None
+
+    if payload.designation is not None:
+        current_user.designation = payload.designation.strip() if payload.designation else None
+
+    audit = AuditLog(
+        action="USER_PROFILE_UPDATED",
+        actor_id=current_user.id,
+        actor_name=current_user.name,
+        actor_role=current_user.role,
+        details=json.dumps({
+            "user_id": current_user.id,
+            "email": current_user.email,
+            "old_name": old_name,
+            "new_name": current_user.name
+        })
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(current_user)
+
+    user_perms = get_user_permissions(current_user)
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "role": current_user.role,
+        "department_id": current_user.department_id,
+        "phone": current_user.phone,
+        "avatar_url": current_user.avatar_url,
         "is_active": current_user.is_active,
         "employee_id": current_user.employee_id,
         "patient_id": getattr(current_user, "patient_id", None),

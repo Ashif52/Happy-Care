@@ -41,6 +41,12 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+class ProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    designation: Optional[str] = None
+
+
 class LoginRequest(BaseModel):
     email: Optional[str] = None
     login_identifier: Optional[str] = None

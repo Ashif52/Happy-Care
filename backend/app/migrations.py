@@ -331,17 +331,19 @@ def run_migrations():
                 logger.info(f"Created personnel: {p['name']} ({p['email']})")
             else:
                 u.email = p["email"]
-                u.employee_id = p["emp_id"]
-                u.name = p["name"]
-                u.designation = p["designation"]
-                if p["department_id"]:
+                if not u.employee_id:
+                    u.employee_id = p["emp_id"]
+                if not u.name:
+                    u.name = p["name"]
+                if not u.designation:
+                    u.designation = p["designation"]
+                if p["department_id"] and not u.department_id:
                     u.department_id = p["department_id"]
-                if p["phone"]:
+                if p["phone"] and not u.phone:
                     u.phone = p["phone"]
                 u.is_active = True
-                u.account_status = "active"
-                u.failed_login_attempts = 0
-                u.hashed_password = pw_hash
+                if not u.account_status:
+                    u.account_status = "active"
 
         db.commit()
 

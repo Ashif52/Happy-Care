@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, or_, func
 
 from app.database import get_db
 from app.models import Notification, User
@@ -35,10 +35,14 @@ class NotificationListResponse(BaseModel):
     total: int
     unread_count: int
     items: List[NotificationResponse]
+    page: int = 1
+    page_size: int = 50
 
 @router.get("", response_model=NotificationListResponse)
 def get_user_notifications(
     unread_only: bool = Query(False, description="Filter for unread notifications only"),
+    search: Optional[str] = Query(None, description="Search notification title or message"),
+    event_type: Optional[str] = Query(None, description="Filter by specific event type"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -47,6 +51,7 @@ def get_user_notifications(
     """
     Retrieves in-app notifications strictly for the authenticated user.
     Enforces authorization: A user can never access another user's notifications.
+    Supports unread filtering, search, and pagination.
     """
     base_query = db.query(Notification).filter(Notification.recipient_id == current_user.id)
     
@@ -59,13 +64,29 @@ def get_user_notifications(
     query = base_query
     if unread_only:
         query = query.filter(Notification.is_read == False)
+    if event_type:
+        query = query.filter(Notification.event_type == event_type.strip())
+    if search and search.strip():
+        term = f"%{search.strip().lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(Notification.title).like(term),
+                func.lower(Notification.message).like(term),
+                func.lower(Notification.ticket_number).like(term)
+            )
+        )
 
+    current_total = query.count()
     items = query.order_by(desc(Notification.created_at)).offset(offset).limit(limit).all()
 
+    current_page = (offset // limit) + 1 if limit > 0 else 1
+
     return {
-        "total": total,
+        "total": current_total,
         "unread_count": unread_count,
-        "items": items
+        "items": items,
+        "page": current_page,
+        "page_size": limit
     }
 
 @router.get("/unread-count")

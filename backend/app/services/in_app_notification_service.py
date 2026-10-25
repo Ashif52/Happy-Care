@@ -115,6 +115,44 @@ class InAppNotificationService:
         return created_notifs
 
     @staticmethod
+    def notify_superadmins(
+        db: Session,
+        event_type: str,
+        title: str,
+        message: str,
+        ticket: Optional[Ticket] = None,
+        destination_link: Optional[str] = None,
+        dedup_prefix: Optional[str] = None
+    ) -> List[Notification]:
+        """
+        Dispatches executive notifications strictly to Super Administrators.
+        Used for organization-wide operational alerts, critical escalations, and system audits.
+        """
+        superadmins = db.query(User).filter(
+            User.role.in_(["superadmin", "super_admin"]),
+            User.is_active == True
+        ).all()
+
+        created_notifs = []
+        for sa in superadmins:
+            dedup_key = f"{dedup_prefix}:{sa.id}" if dedup_prefix else None
+            notif = InAppNotificationService.create_notification(
+                db=db,
+                recipient_id=sa.id,
+                event_type=event_type,
+                title=title,
+                message=message,
+                ticket_id=ticket.id if ticket else None,
+                ticket_number=ticket.ticket_number if ticket else None,
+                department_id=ticket.department_id if ticket else None,
+                destination_link=destination_link or ("/superadmin-admins" if "ADMIN" in event_type else "/overview"),
+                dedup_key=dedup_key
+            )
+            if notif:
+                created_notifs.append(notif)
+        return created_notifs
+
+    @staticmethod
     def notify_administrators(
         db: Session,
         event_type: str,
@@ -127,13 +165,19 @@ class InAppNotificationService:
         include_superadmin: bool = True
     ) -> List[Notification]:
         """
-        Notifies administrators and superadmins within authorized administrative scope.
+        Notifies administrators within authorized scope.
+        If an administrator is department-scoped, they only receive events for their department.
+        Hospital-wide administrators (department_id is None) receive all hospital-wide alerts.
         """
         roles = ["admin", "superadmin"] if include_superadmin else ["admin"]
         admins = db.query(User).filter(User.role.in_(roles), User.is_active == True).all()
 
         created_notifs = []
         for admin in admins:
+            # Enforce department scoping: If admin is bound to a department, do not leak other departments' data
+            if department_id and admin.role == "admin" and admin.department_id and admin.department_id != department_id:
+                continue
+
             dedup_key = f"{dedup_prefix}:{admin.id}" if dedup_prefix else None
             notif = InAppNotificationService.create_notification(
                 db=db,
@@ -163,8 +207,8 @@ class InAppNotificationService:
         dedup_key: Optional[str] = None
     ) -> Optional[Notification]:
         """
-        Sends an in-app notification to the assigned staff member.
-        Staff only receives notifications for tickets assigned to them!
+        Sends an in-app notification strictly to the assigned staff member.
+        Staff only receives notifications for tasks assigned to them.
         """
         if not ticket.assigned_staff_id:
             return None
@@ -179,5 +223,35 @@ class InAppNotificationService:
             ticket_number=ticket.ticket_number,
             department_id=ticket.department_id,
             destination_link=destination_link or f"/my-department?ticket={ticket.id}",
+            dedup_key=dedup_key
+        )
+
+    @staticmethod
+    def notify_patient(
+        db: Session,
+        ticket: Ticket,
+        event_type: str,
+        title: str,
+        message: str,
+        destination_link: Optional[str] = None,
+        dedup_key: Optional[str] = None
+    ) -> Optional[Notification]:
+        """
+        Sends an in-app notification strictly to the patient user for their own complaints.
+        Internal notifications must NOT trigger extra patient emails.
+        """
+        if not ticket.patient_user_id:
+            return None
+
+        return InAppNotificationService.create_notification(
+            db=db,
+            recipient_id=ticket.patient_user_id,
+            event_type=event_type,
+            title=title,
+            message=message,
+            ticket_id=ticket.id,
+            ticket_number=ticket.ticket_number,
+            department_id=ticket.department_id,
+            destination_link=destination_link or f"/track/{ticket.ticket_number}",
             dedup_key=dedup_key
         )

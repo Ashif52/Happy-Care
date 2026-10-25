@@ -790,6 +790,8 @@ export const api = {
   resetPasswordWithToken: (data: { token: string; new_password: string }) =>
     fetchWithAuth("/auth/reset-password-with-token", { method: "POST", body: JSON.stringify(data) }),
   getMe: () => fetchWithAuth("/auth/me"),
+  updateProfile: (data: { name?: string; phone?: string; designation?: string }) =>
+    fetchWithAuth("/auth/profile", { method: "PUT", body: JSON.stringify(data) }),
   getDemoUsers: () => fetchWithAuth("/auth/demo-users"),
   getSimulationAccounts: (): Promise<SimulationAccount[]> => fetchWithAuth("/auth/simulation-accounts"),
 
@@ -945,11 +947,25 @@ export const api = {
     fetchWithAuth(ticketId ? `/audit?ticket_id=${ticketId}` : "/audit"),
 
   // In-App Role-Aware Notifications
-  getNotifications: (unreadOnly?: boolean, limit?: number, offset?: number) => {
+  getNotifications: (
+    optsOrUnreadOnly?: boolean | { unread_only?: boolean; limit?: number; offset?: number; page?: number; page_size?: number; search?: string; event_type?: string },
+    limit?: number,
+    offset?: number
+  ) => {
     const params = new URLSearchParams();
-    if (unreadOnly) params.append("unread_only", "true");
-    if (limit) params.append("limit", String(limit));
-    if (offset) params.append("offset", String(offset));
+    if (typeof optsOrUnreadOnly === "object" && optsOrUnreadOnly !== null) {
+      if (optsOrUnreadOnly.unread_only) params.append("unread_only", "true");
+      if (optsOrUnreadOnly.limit) params.append("limit", String(optsOrUnreadOnly.limit));
+      if (optsOrUnreadOnly.offset) params.append("offset", String(optsOrUnreadOnly.offset));
+      if (optsOrUnreadOnly.page) params.append("page", String(optsOrUnreadOnly.page));
+      if (optsOrUnreadOnly.page_size) params.append("page_size", String(optsOrUnreadOnly.page_size));
+      if (optsOrUnreadOnly.search) params.append("search", optsOrUnreadOnly.search);
+      if (optsOrUnreadOnly.event_type) params.append("event_type", optsOrUnreadOnly.event_type);
+    } else {
+      if (optsOrUnreadOnly) params.append("unread_only", "true");
+      if (limit) params.append("limit", String(limit));
+      if (offset) params.append("offset", String(offset));
+    }
     const qs = params.toString();
     return fetchWithAuth(qs ? `/notifications?${qs}` : "/notifications");
   },

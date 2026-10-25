@@ -12,7 +12,8 @@ import {
   AlertTriangle,
   LogOut,
   RefreshCw,
-  KeyRound
+  KeyRound,
+  User as UserIcon
 } from "lucide-react";
 import { User, SimulationAccount, api } from "@/lib/api";
 import { ChangePasswordModal } from "@/components/ChangePasswordModal";
@@ -24,6 +25,7 @@ interface HeaderProps {
   simulationAccounts?: SimulationAccount[];
   onSelectRoleUser: (email: string) => void;
   onOpenCreateModal: () => void;
+  onOpenEditProfile?: () => void;
   onSearch: (query: string) => void;
   onRefreshData: () => void;
   isRefreshing?: boolean;
@@ -38,6 +40,7 @@ export function Header({
   simulationAccounts,
   onSelectRoleUser,
   onOpenCreateModal,
+  onOpenEditProfile,
   onSearch,
   onRefreshData,
   isRefreshing = false,
@@ -140,7 +143,21 @@ export function Header({
     });
   }
 
-  const displayAccounts = mergedAccounts.map((acc) => {
+  const displayAccounts = mergedAccounts
+    .filter((acc) => {
+      // If current user is not superadmin, System Superadmin won't show for admin
+      if (currentUser?.role !== "superadmin") {
+        const isSuperadmin =
+          acc.role === "superadmin" ||
+          acc.role === "Superadmin (Root)" ||
+          acc.badge === "SUPERADMIN" ||
+          acc.email?.toLowerCase().includes("superadmin") ||
+          acc.name?.toLowerCase().includes("superadmin");
+        if (isSuperadmin) return false;
+      }
+      return true;
+    })
+    .map((acc) => {
     if (currentUser && currentUser.email?.toLowerCase() === acc.email?.toLowerCase()) {
       return {
         ...acc,
@@ -243,6 +260,17 @@ export function Header({
                 ))}
 
                 <div className="pt-1.5 border-t border-[#E2E8F0] mt-1 space-y-1">
+                  <button
+                    onClick={() => {
+                      setShowRoleMenu(false);
+                      if (onOpenEditProfile) onOpenEditProfile();
+                    }}
+                    className="w-full text-left p-2 rounded-lg hover:bg-slate-100 text-slate-800 font-bold flex items-center justify-between transition-colors cursor-pointer text-xs"
+                  >
+                    <span>Edit My Profile</span>
+                    <UserIcon className="h-3.5 w-3.5 text-[#176B63]" />
+                  </button>
+
                   <button
                     onClick={() => {
                       setShowRoleMenu(false);

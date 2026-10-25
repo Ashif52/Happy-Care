@@ -302,11 +302,44 @@ def review_verification(
     job.human_reviewed_at = datetime.now(timezone.utc)
     
     # If supervisor approves, and ticket is ready, advance ticket to completed/closed
+    from app.services.in_app_notification_service import InAppNotificationService
+
     if payload.decision == "approved":
         if ticket.status in ["resolution_submitted", "work_completed"]:
             ticket.status = "closed"
             ticket.closed_at = datetime.now(timezone.utc)
             ticket.is_escalated = False
+
+        if ticket.assigned_staff_id:
+            InAppNotificationService.notify_assigned_staff(
+                db=db,
+                ticket=ticket,
+                event_type="TASK_APPROVED",
+                title=f"Task Approved: {ticket.ticket_number}",
+                message=f"Supervisor {current_user.name} approved your resolution for Room {ticket.room_number}.",
+                dedup_key=f"VERIFY_APPROVE_STAFF:{job.id}:{ticket.id}"
+            )
+        if ticket.patient_user_id:
+            InAppNotificationService.notify_patient(
+                db=db,
+                ticket=ticket,
+                event_type="PATIENT_TICKET_CLOSED",
+                title="Service Request Resolved & Closed",
+                message=f"Your request #{ticket.ticket_number} (Room {ticket.room_number}) has been inspected and closed.",
+                dedup_key=f"VERIFY_APPROVE_PATIENT:{job.id}:{ticket.id}"
+            )
+    elif payload.decision == "rejected":
+        # Return task for correction
+        ticket.status = "in_progress"
+        if ticket.assigned_staff_id:
+            InAppNotificationService.notify_assigned_staff(
+                db=db,
+                ticket=ticket,
+                event_type="TASK_RETURNED_FOR_CORRECTION",
+                title=f"Task Returned for Correction: {ticket.ticket_number}",
+                message=f"Supervisor {current_user.name} requested corrections for Room {ticket.room_number}: {payload.notes or 'Please address issues and resubmit evidence.'}",
+                dedup_key=f"VERIFY_REJECT_STAFF:{job.id}:{ticket.id}"
+            )
             
     audit = AuditLog(
         ticket_id=ticket.id,

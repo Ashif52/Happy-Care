@@ -132,12 +132,18 @@ export function AdminManagementView() {
     }
   };
 
-  const filteredAdmins = admins.filter(
-    (a) =>
-      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (a.phone && a.phone.includes(searchQuery))
-  );
+  const filteredAdmins = admins
+    .filter(
+      (a) =>
+        a.role === "admin" ||
+        (a.role !== "superadmin" && !a.email.toLowerCase().includes("superadmin"))
+    )
+    .filter(
+      (a) =>
+        a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (a.phone && a.phone.includes(searchQuery))
+    );
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -194,7 +200,7 @@ export function AdminManagementView() {
           />
         </div>
         <div className="text-xs text-[#667085]">
-          Total Administrators: <span className="font-bold text-[#17212F]">{admins.length}</span>
+          Total Administrators: <span className="font-bold text-[#17212F]">{filteredAdmins.length}</span>
         </div>
       </div>
 

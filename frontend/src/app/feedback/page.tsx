@@ -76,9 +76,9 @@ export default function HospitalFeedbackPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-[#F7F9FB] to-slate-100 text-slate-800 flex flex-col justify-between selection:bg-[#176B63] selection:text-white font-sans">
+    <div className="min-h-screen min-h-[100dvh] w-full bg-gradient-to-b from-slate-50 via-[#F7F9FB] to-slate-100 text-slate-800 flex flex-col selection:bg-[#176B63] selection:text-white font-sans overflow-x-hidden">
       {/* Top Header */}
-      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 px-4 py-3.5 shadow-xs">
+      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 px-4 py-3.5 shadow-xs shrink-0">
         <div className="max-w-xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#176B63] to-[#125852] flex items-center justify-center text-white shadow-xs">
@@ -103,7 +103,7 @@ export default function HospitalFeedbackPage() {
       </header>
 
       {/* Main Container */}
-      <main className="max-w-xl w-full mx-auto p-4 sm:p-6 flex-1 flex flex-col justify-center">
+      <main className="max-w-xl w-full mx-auto px-4 py-6 sm:py-8 flex-1">
         {!isSubmitted ? (
           <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xl shadow-slate-200/50 space-y-6">
             {/* Headline */}
@@ -396,7 +396,7 @@ export default function HospitalFeedbackPage() {
       </main>
 
       {/* Footer */}
-      <footer className="py-4 text-center text-slate-400 text-[11px] border-t border-slate-200 bg-white">
+      <footer className="py-5 text-center text-slate-400 text-[11px] border-t border-slate-200 bg-white mt-auto shrink-0">
         <p>&copy; 2026 Metropolitan General Hospital &bull; Happy Care Patient Experience System</p>
       </footer>
     </div>

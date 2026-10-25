@@ -460,40 +460,27 @@ export function PortalLoginGateway({
             <div className="flex flex-wrap gap-1.5">
               {selectedPortal === "admin" && (
                 <>
-                  {simAccounts.filter((a) => a.role === "admin" || a.role === "superadmin").length > 0 ? (
+                  {simAccounts.filter((a) => a.role === "admin").length > 0 ? (
                     simAccounts
-                      .filter((a) => a.role === "admin" || a.role === "superadmin")
+                      .filter((a) => a.role === "admin")
                       .map((acc) => (
                         <button
                           key={acc.email}
                           type="button"
                           onClick={() => fillPreset(acc.email, "password123")}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                            acc.role === "superadmin"
-                              ? "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200"
-                              : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                          }`}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700"
                         >
-                          {acc.name} ({acc.badge || (acc.role === "superadmin" ? "Root" : "Admin")})
+                          {acc.name} ({acc.badge || "Admin"})
                         </button>
                       ))
                   ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => fillPreset("admin@careops.hospital", "password123")}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
-                      >
-                        Hospital Administrator (Admin)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => fillPreset("superadmin@careops.hospital", "password123")}
-                        className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold transition-colors cursor-pointer"
-                      >
-                        Superadmin (Root)
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => fillPreset("admin@careops.hospital", "password123")}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                    >
+                      Hospital Administrator (Admin)
+                    </button>
                   )}
                 </>
               )}

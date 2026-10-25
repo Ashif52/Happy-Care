@@ -25,6 +25,7 @@ import { DatabaseMaintenanceView } from "@/components/superadmin/DatabaseMainten
 import { NPSModuleView } from "@/components/nps/NPSModuleView";
 import { EmailDeliveryManager } from "@/components/EmailDeliveryManager";
 import { PatientAccountsView } from "@/components/PatientAccountsView";
+import { EditProfileModal } from "@/components/common/EditProfileModal";
 import { QrCode, Bell, Sparkles, Lock, Trash2, CheckCircle2 } from "lucide-react";
 
 import {

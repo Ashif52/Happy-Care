@@ -33,6 +33,7 @@ interface SidebarProps {
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
   onOpenPatientPortal: () => void;
+  onOpenEditProfile?: () => void;
   onLogout: () => void;
 }
 
@@ -52,6 +53,7 @@ export function Sidebar({
   collapsed,
   setCollapsed,
   onOpenPatientPortal,
+  onOpenEditProfile,
   onLogout,
 }: SidebarProps) {
   const userRole = currentUser?.role || "admin";
@@ -65,19 +67,41 @@ export function Sidebar({
   if (userRole === "superadmin") {
     navGroups = [
       {
-        groupTitle: "Governance",
+        groupTitle: "Superadmin Authority",
         items: [
-          { id: "overview", label: "Executive Dashboard", icon: LayoutDashboard },
           { id: "superadmin-admins", label: "Admin Accounts", icon: UserCheck },
-          { id: "departments", label: "Hospital Staff Directory", icon: Building2 },
-        ],
-      },
-      {
-        groupTitle: "Security & Core",
-        items: [
           { id: "superadmin-security", label: "Security Settings", icon: Lock },
           { id: "superadmin-audit", label: "Superadmin Audit", icon: ScrollText },
           { id: "superadmin-maintenance", label: "Database Purge", icon: Database },
+        ],
+      },
+      {
+        groupTitle: "Operations",
+        items: [
+          { id: "overview", label: "Executive Dashboard", icon: LayoutDashboard },
+          { id: "tickets", label: "All Tickets", icon: Ticket },
+          { id: "my-department", label: "Staff Workspace", icon: Briefcase },
+          { id: "ai-verify", label: "AI Verification", icon: Sparkles },
+          { id: "sla", label: "Escalation & SLA", icon: ClockAlert },
+        ],
+      },
+      {
+        groupTitle: "Care Units & Experience",
+        items: [
+          { id: "departments", label: "Departments & Staff", icon: Building2 },
+          { id: "patient-accounts", label: "Patient Accounts", icon: Users },
+          { id: "rooms", label: "QR Room Ops", icon: QrCode },
+          { id: "nps", label: "NPS & Patient Voice", icon: HeartHandshake },
+          { id: "reviews", label: "Google Reputation", icon: Star },
+        ],
+      },
+      {
+        groupTitle: "Platform & System",
+        items: [
+          { id: "emails", label: "Email & SMTP", icon: Mail },
+          { id: "analytics", label: "Analytics & Reports", icon: BarChart3 },
+          { id: "audit", label: "Audit Logs", icon: ScrollText },
+          { id: "settings", label: "Settings & System", icon: Settings },
         ],
       },
     ];
@@ -240,8 +264,8 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Patient Bedside Simulator Action Card (Admin Only) */}
-        {userRole === "admin" && (
+        {/* Patient Bedside Simulator Action Card (Admin & SuperAdmin) */}
+        {(userRole === "admin" || userRole === "superadmin") && (
           <div className="pt-2">
             <button
               onClick={onOpenPatientPortal}
@@ -269,47 +293,55 @@ export function Sidebar({
       {/* User Account Footer */}
       <div className="p-2.5 border-t border-slate-200/70 bg-slate-50/60 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="relative shrink-0">
-            <div className="h-7.5 w-7.5 rounded-full bg-[#176B63]/12 text-[#176B63] ring-1 ring-[#176B63]/25 flex items-center justify-center font-black text-[11px] shadow-2xs">
-              {currentUser?.name
-                ? currentUser.name
-                    .split(" ")
-                    .filter(Boolean)
-                    .map((n: string) => n[0])
-                    .slice(0, 2)
-                    .join("")
-                    .toUpperCase()
-                : "U"}
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[#16805D] ring-2 ring-white" />
-          </div>
-          {!collapsed && (
-            <div className="flex-1 overflow-hidden min-w-0">
-              <div className="text-[11.5px] font-black text-slate-800 truncate leading-tight">
-                {currentUser?.name || "Hospital User"}
+          <div
+            onClick={onOpenEditProfile}
+            className={`flex items-center gap-2 flex-1 min-w-0 ${
+              onOpenEditProfile ? "cursor-pointer p-1 -m-1 rounded-lg hover:bg-slate-200/50 transition-colors" : ""
+            }`}
+            title={onOpenEditProfile ? "Click to view and edit profile" : undefined}
+          >
+            <div className="relative shrink-0">
+              <div className="h-7.5 w-7.5 rounded-full bg-[#176B63]/12 text-[#176B63] ring-1 ring-[#176B63]/25 flex items-center justify-center font-black text-[11px] shadow-2xs">
+                {currentUser?.name
+                  ? currentUser.name
+                      .split(" ")
+                      .filter(Boolean)
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase()
+                  : "U"}
               </div>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span
-                  className={`text-[8.5px] uppercase font-black px-1.5 py-0.2 rounded tracking-wider border leading-tight ${
-                    userRole === "superadmin"
-                      ? "bg-rose-50 text-rose-700 border-rose-200"
-                      : userRole === "admin"
-                      ? "bg-[#176B63]/10 text-[#176B63] border-[#176B63]/20"
-                      : userRole === "supervisor"
-                      ? "bg-amber-50 text-amber-800 border-amber-200"
-                      : "bg-blue-50 text-blue-700 border-blue-200"
-                  }`}
-                >
-                  {userRole}
-                </span>
-                {currentUser?.department_id && (
-                  <span className="text-[9.5px] text-slate-500 capitalize font-medium truncate">
-                    {currentUser.department_id}
+              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[#16805D] ring-2 ring-white" />
+            </div>
+            {!collapsed && (
+              <div className="flex-1 overflow-hidden min-w-0 text-left">
+                <div className="text-[11.5px] font-black text-slate-800 truncate leading-tight hover:text-[#176B63] transition-colors">
+                  {currentUser?.name || "Hospital User"}
+                </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span
+                    className={`text-[8.5px] uppercase font-black px-1.5 py-0.2 rounded tracking-wider border leading-tight ${
+                      userRole === "superadmin"
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : userRole === "admin"
+                        ? "bg-[#176B63]/10 text-[#176B63] border-[#176B63]/20"
+                        : userRole === "supervisor"
+                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                    }`}
+                  >
+                    {userRole}
                   </span>
-                )}
+                  {currentUser?.department_id && (
+                    <span className="text-[9.5px] text-slate-500 capitalize font-medium truncate">
+                      {currentUser.department_id}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
           <button
             onClick={onLogout}
             className="h-7 w-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer shrink-0"

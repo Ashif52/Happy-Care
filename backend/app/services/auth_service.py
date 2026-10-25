@@ -135,12 +135,12 @@ def get_current_patient(token: Optional[str] = Depends(oauth2_scheme), db: Sessi
 
 def require_roles(*roles: str):
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Requires one of roles: {', '.join(roles)}"
-            )
-        return current_user
+        if current_user.role == "superadmin" or current_user.role in roles:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied. Requires one of roles: {', '.join(roles)}"
+        )
     return role_checker
 
 def require_permission(permission_key: str):

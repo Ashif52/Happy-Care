@@ -18,6 +18,7 @@ import {
   X
 } from "lucide-react";
 import { api, NotificationItem, formatDateTime } from "@/lib/api";
+import { NotificationInboxModal } from "./NotificationInboxModal";
 
 interface NotificationBellDropdownProps {
   onSelectTicket?: (ticketId: number) => void;
@@ -29,6 +30,7 @@ export function NotificationBellDropdown({
   onNavigateTab,
 }: NotificationBellDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showInboxModal, setShowInboxModal] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -387,8 +389,31 @@ export function NotificationBellDropdown({
               })
             )}
           </div>
+
+          {/* Footer: View All Notifications & Inbox */}
+          <div className="p-2 border-t border-[#E2E8F0] bg-slate-50/90">
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setShowInboxModal(true);
+              }}
+              className="w-full py-2 px-3 rounded-lg bg-white border border-[#CBD5E1] hover:bg-[#F8FAFC] text-[11px] font-bold text-[#176B63] flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            >
+              <span>View All Notifications & Inbox</span>
+              <ExternalLink className="h-3 w-3" />
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Full Paginated Notification Inbox Modal */}
+      <NotificationInboxModal
+        isOpen={showInboxModal}
+        onClose={() => setShowInboxModal(false)}
+        onSelectTicket={onSelectTicket}
+        onNavigateTab={onNavigateTab}
+        onRefreshUnreadCount={() => loadNotifications(false)}
+      />
     </div>
   );
 }

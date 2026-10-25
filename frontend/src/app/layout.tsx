@@ -23,10 +23,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#F7F8FA] text-[#17212F]">
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}>
+      <head>
+        <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/sf-pro-display" />
+      </head>
+      <body className="min-h-screen flex flex-col bg-[#F7F8FA] text-[#17212F] overflow-x-hidden overflow-y-auto">
         {children}
       </body>
     </html>
   );
 }
+

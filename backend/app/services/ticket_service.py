@@ -208,6 +208,15 @@ class TicketService:
                 ticket=ticket,
                 dedup_prefix=f"ADMIN_NEW_TICKET:{ticket.id}"
             )
+            if ticket.patient_user_id:
+                InAppNotificationService.notify_patient(
+                    db=db,
+                    ticket=ticket,
+                    event_type="PATIENT_REQUEST_RECEIVED",
+                    title="Service Request Received",
+                    message=f"Your request #{ticket.ticket_number} for {ticket.category} has been received.",
+                    dedup_key=f"PATIENT_RECEIVED:{ticket.id}"
+                )
         except Exception as e:
             logger.warning(f"Error creating in-app notification for new ticket: {e}")
 
@@ -344,6 +353,19 @@ class TicketService:
                 destination_link=f"/my-department?ticket={ticket.id}",
                 dedup_key=f"ASSIGN_SUP:{ticket.id}:{staff.id}"
             )
+            if is_reassignment and old_staff_id and old_staff_id != staff.id:
+                InAppNotificationService.create_notification(
+                    db=db,
+                    recipient_id=old_staff_id,
+                    event_type="TICKET_REASSIGNED",
+                    title=f"Task Reassigned: {ticket.ticket_number}",
+                    message=f"Task #{ticket.ticket_number} (Room {ticket.room_number}) has been reassigned to {staff.name}.",
+                    ticket_id=ticket.id,
+                    ticket_number=ticket.ticket_number,
+                    department_id=ticket.department_id,
+                    destination_link=f"/my-department",
+                    dedup_key=f"REASSIGN_OLD:{ticket.id}:{old_staff_id}:{staff.id}"
+                )
         except Exception as e:
             logger.warning(f"Error creating in-app notification on assignment: {e}")
 
@@ -473,6 +495,15 @@ class TicketService:
                 ticket=ticket,
                 dedup_prefix=f"WORK_STARTED:{ticket.id}"
             )
+            if ticket.patient_user_id:
+                InAppNotificationService.notify_patient(
+                    db=db,
+                    ticket=ticket,
+                    event_type="PATIENT_WORK_STARTED",
+                    title="Staff Working on Your Request",
+                    message=f"Staff member {user.name} has begun work on request #{ticket.ticket_number}.",
+                    dedup_key=f"PATIENT_STARTED:{ticket.id}"
+                )
         except Exception as e:
             logger.warning(f"Error creating in-app notification on work started: {e}")
 
@@ -551,6 +582,15 @@ class TicketService:
                 destination_link=f"/my-department?ticket={ticket.id}",
                 dedup_prefix=f"RESOLUTION_SUBMITTED:{ticket.id}"
             )
+            if ticket.patient_user_id:
+                InAppNotificationService.notify_patient(
+                    db=db,
+                    ticket=ticket,
+                    event_type="PATIENT_WORK_COMPLETED",
+                    title="Work Completed",
+                    message=f"Work has been completed for request #{ticket.ticket_number} (Room {ticket.room_number}) and is awaiting inspection.",
+                    dedup_key=f"PATIENT_COMPLETED:{ticket.id}"
+                )
         except Exception as e:
             logger.warning(f"Error creating in-app notification on resolution submitted: {e}")
 
@@ -612,6 +652,15 @@ class TicketService:
                 message=f"Supervisor {user.name} approved resolution for Room {ticket.room_number}.",
                 dedup_key=f"TICKET_CLOSED:{ticket.id}"
             )
+            if ticket.patient_user_id:
+                InAppNotificationService.notify_patient(
+                    db=db,
+                    ticket=ticket,
+                    event_type="PATIENT_TICKET_CLOSED",
+                    title="Service Request Closed",
+                    message=f"Your service request #{ticket.ticket_number} has been officially verified and closed.",
+                    dedup_key=f"PATIENT_CLOSED:{ticket.id}"
+                )
         except Exception as e:
             logger.warning(f"Error creating in-app notification on ticket closed: {e}")
 

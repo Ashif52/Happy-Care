@@ -72,7 +72,7 @@ export default function TrackClient({
   }, [ticketNumber]);
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] flex flex-col items-center justify-center p-3 sm:p-6">
+    <div className="min-h-screen min-h-[100dvh] bg-[#F0F2F5] flex flex-col items-center p-3 sm:p-6 py-6 sm:py-10 overflow-x-hidden">
       <div className="w-full max-w-lg mb-3 flex items-center justify-between text-xs text-[#475467] px-2">
         <a
           href="/"

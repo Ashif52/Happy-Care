@@ -87,6 +87,10 @@ def list_staff(
 
     query = db.query(User)
 
+    # Exclude System Superadmin from staff directory for hospital admins and staff
+    if current_user.role != "superadmin":
+        query = query.filter(User.role != "superadmin")
+
     # Department scoping for Department Supervisors
     if current_user.role == "supervisor" and not has_permission(current_user, "staff.create"):
         query = query.filter(User.department_id == current_user.department_id)
@@ -114,6 +118,8 @@ def list_staff(
 
     # Global Live Metrics
     metrics_base = db.query(User)
+    if current_user.role != "superadmin":
+        metrics_base = metrics_base.filter(User.role != "superadmin")
     if current_user.role == "supervisor" and not has_permission(current_user, "staff.create"):
         metrics_base = metrics_base.filter(User.department_id == current_user.department_id)
         

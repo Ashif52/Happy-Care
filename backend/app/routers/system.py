@@ -49,6 +49,8 @@ class AdminUpdateRequest(BaseModel):
     phone: Optional[str] = None
     designation: Optional[str] = None
     email: Optional[str] = None
+    password: Optional[str] = None
+    account_status: Optional[str] = None
 
 class AdminPermissionsUpdateRequest(BaseModel):
     permissions: List[str]
@@ -511,6 +513,14 @@ def update_admin_account(
             raise HTTPException(status_code=400, detail="Email already registered to another account.")
         admin.email = clean_email
 
+    if payload.password and payload.password.strip():
+        admin.hashed_password = get_password_hash(payload.password.strip())
+        admin.token_version = (getattr(admin, "token_version", 1) or 1) + 1
+
+    if payload.account_status:
+        admin.account_status = payload.account_status
+        admin.is_active = (payload.account_status == "active")
+
     audit = AuditLog(
         action="SUPERADMIN_UPDATED_ADMIN",
         actor_id=current_user.id,
@@ -521,6 +531,20 @@ def update_admin_account(
     db.add(audit)
     db.commit()
     db.refresh(admin)
+
+    try:
+        from app.services.in_app_notification_service import InAppNotificationService
+        InAppNotificationService.create_notification(
+            db=db,
+            recipient_id=admin.id,
+            event_type="PROFILE_UPDATED",
+            title="Administrator Profile Updated",
+            message=f"Superadmin {current_user.name} updated your administrator account details.",
+            destination_link="/overview",
+            dedup_key=f"ADMIN_UPDATED:{admin.id}:{utc_now().strftime('%Y%m%d%H%M')}"
+        )
+    except Exception as e:
+        logger.warning(f"Error dispatching admin update notification: {e}")
 
     return {
         "success": True,
@@ -643,6 +667,28 @@ def set_admin_permissions(
     db.add(audit)
     db.commit()
     db.refresh(admin)
+
+    try:
+        from app.services.in_app_notification_service import InAppNotificationService
+        InAppNotificationService.create_notification(
+            db=db,
+            recipient_id=admin.id,
+            event_type="PERMISSIONS_UPDATED",
+            title="Administrator Permissions Updated",
+            message=f"Superadmin {current_user.name} updated your administrative authorization matrix ({len(sanitized_perms)} permissions).",
+            destination_link="/overview",
+            dedup_key=f"ADMIN_PERMS:{admin.id}:{utc_now().strftime('%Y%m%d%H%M')}"
+        )
+        InAppNotificationService.notify_superadmins(
+            db=db,
+            event_type="ADMIN_PERMISSIONS_CHANGED",
+            title=f"Admin Permissions Modified: {admin.name}",
+            message=f"Superadmin {current_user.name} configured permissions for Admin {admin.name} ({admin.email}).",
+            destination_link="/superadmin-admins",
+            dedup_prefix=f"SA_PERM_LOG:{admin.id}:{utc_now().strftime('%Y%m%d%H%M')}"
+        )
+    except Exception as e:
+        logger.warning(f"Error dispatching admin permissions notification: {e}")
 
     return {
         "success": True,

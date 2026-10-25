@@ -194,12 +194,21 @@ HOSPITAL_ROLES: Dict[str, Dict[str, Any]] = {
     "superadmin": {
         "id": "superadmin",
         "name": "Super Administrator",
-        "description": "System owner with administrative oversight only: manage Admins, configure Admin permissions, security settings, audit logs, and database maintenance. No operational ticket/review screens.",
+        "description": "System owner with root platform authority: full access to all operational modules, tickets, reviews, staff directory, plus exclusive admin provisioning, security settings, and database purge.",
         "protected_system_role": True,
         "permissions": [
+            "tickets.read", "tickets.create", "tickets.update", "tickets.delete", "tickets.assign", "tickets.export",
+            "staff.read", "staff.create", "staff.update", "staff.deactivate", "staff.assign", "staff.export",
+            "supervisors.read", "supervisors.create", "supervisors.update", "supervisors.deactivate", "supervisors.assign", "supervisors.export",
+            "departments.read", "departments.create", "departments.update", "departments.delete", "departments.assign", "departments.export",
+            "qr.read", "qr.create", "qr.update", "qr.delete",
+            "analytics.read", "analytics.export",
+            "audit.read", "audit.export",
+            "nps.read", "nps.create", "nps.update", "nps.export",
+            "google_reviews.read", "google_reviews.create", "google_reviews.update", "google_reviews.export",
+            "cap.read", "cap.create", "cap.update", "cap.delete", "cap.assign", "cap.export",
             "admin.read", "admin.create", "admin.update", "admin.deactivate", "admin.permissions_manage",
             "security_settings.read", "security_settings.manage",
-            "audit.read", "audit.export",
             "db_maintenance.execute"
         ]
     },
@@ -297,6 +306,10 @@ def has_permission(user, permission_key: str) -> bool:
     """Check if the given user holds the requested permission key."""
     if not user or not user.is_active or getattr(user, "account_status", "active") != "active":
         return False
+    
+    # Root superadmin holds all system and operational permissions
+    if getattr(user, "role", "") == "superadmin":
+        return True
     
     effective = set(get_user_permissions(user))
     
